@@ -1,0 +1,33 @@
+name: Create YouTube Video
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-video:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download AI voice
+        run: |
+          curl -L "https://ai-youtube-automation.waiqqq950.workers.dev/script-voice/test" -o voice.mp3
+
+      - name: Create video
+        run: |
+          ffmpeg -y \
+            -f lavfi \
+            -i "color=c=black:s=1920x1080:r=30" \
+            -i voice.mp3 \
+            -vf "drawtext=text='5 AI Tools That Can Save You Hours Every Week':fontcolor=white:fontsize=60:x=(w-text_w)/2:y=(h-text_h)/2" \
+            -c:v libx264 \
+            -preset veryfast \
+            -c:a aac \
+            -b:a 192k \
+            -shortest \
+            video.mp4
+
+      - name: Save video
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-video
+          path: video.mp4
