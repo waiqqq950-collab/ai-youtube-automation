@@ -7,15 +7,16 @@ jobs:
   create-video:
     runs-on: ubuntu-latest
 
-    steps:      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+    steps:
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Download AI voice
         run: |
-          curl -L "https://ai-youtube-automation.waiqqq950.workers.dev/script-voice/test" -o voice.mp3
-    - name: Install ffmpeg
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg
+          curl -L "https://ai-youtube-automation.waiqqq950.workers.dev/voice/test" -o voice.mp3
+
       - name: Create video
         run: |
           ffmpeg -y \
