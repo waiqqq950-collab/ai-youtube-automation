@@ -15,7 +15,13 @@ jobs:
 
       - name: Download AI voice
         run: |
-          curl -L "https://ai-youtube-automation.waiqqq950.workers.dev/voice/test" -o voice.mp3
+          curl -fL "https://ai-youtube-automation.waiqqq950.workers.dev/voice/test" -o voice.mp3
+          file voice.mp3
+          ls -lh voice.mp3
+
+      - name: Check audio
+        run: |
+          ffprobe -v error voice.mp3
 
       - name: Create video
         run: |
