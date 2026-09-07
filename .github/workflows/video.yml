@@ -23,18 +23,13 @@ jobs:
         run: |
           ffprobe -v error voice.mp3
 
-      - name: Create visual video
+           - name: Create visual video
         run: |
           ffmpeg -y \
             -f lavfi \
-            -i "color=c=black:s=1920x1080:r=30" \
+            -i "color=c=0x111827:s=1920x1080:r=30" \
             -i voice.mp3 \
-            -filter_complex "
-            [0:v]drawtext=text='AI TOOLS & PRODUCTIVITY':fontcolor=white:fontsize=70:x=(w-text_w)/2:y=350,
-            drawtext=text='Work Smarter With AI':fontcolor=white:fontsize=45:x=(w-text_w)/2:y=500,
-            drawtext=text='Daily AI Tips':fontcolor=white:fontsize=35:x=(w-text_w)/2:y=600
-            [v]
-            " \
+            -filter_complex "[0:v]drawtext=text='AI TOOLS':fontcolor=white:fontsize=100:x=(w-text_w)/2:y=330,drawtext=text='WORK SMARTER':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=470,drawtext=text='Daily AI Productivity Tip':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=580,drawbox=x=460:y=680:w=1000:h=8:color=white@0.25:t=fill,drawbox=x=460:y=680:w='min(1000,t*100)':h=8:color=white:t=fill[v]" \
             -map "[v]" \
             -map 1:a \
             -c:v libx264 \
