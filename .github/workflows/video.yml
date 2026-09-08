@@ -15,22 +15,28 @@ jobs:
 
       - name: Download AI voice
         run: |
-         curl -L "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" -o voice.mp3
+          curl -L \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
+            -o voice.mp3
+
+      - name: Check downloaded audio
+        run: |
+          echo "Checking audio file..."
           file voice.mp3
           ls -lh voice.mp3
+          ffprobe -v error \
+            -show_format \
+            -show_streams \
+            voice.mp3
 
-      - name: Check audio
-  run: |
-    file voice.mp3
-    ls -lh voice.mp3
-    ffprobe -v error -show_format -show_streams voice.mp3
       - name: Create visual video
         run: |
           ffmpeg -y \
             -f lavfi \
             -i "color=c=0x111827:s=1920x1080:r=30" \
             -i voice.mp3 \
-            -filter_complex "[0:v]drawtext=text='AI TOOLS':fontcolor=white:fontsize=100:x=(w-text_w)/2:y=330,drawtext=text='WORK SMARTER':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=470,drawtext=text='Daily AI Productivity Tip':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=580,drawbox=x=460:y=680:w=1000:h=8:color=white@0.25:t=fill,drawbox=x=460:y=680:w='min(1000,t*100)':h=8:color=white:t=fill[v]" \
+            -filter_complex \
+            "[0:v]drawtext=text='AI TOOLS':fontcolor=white:fontsize=100:x=(w-text_w)/2:y=330,drawtext=text='WORK SMARTER':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=470,drawtext=text='Daily AI Productivity Tip':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=580[v]" \
             -map "[v]" \
             -map 1:a \
             -c:v libx264 \
@@ -39,6 +45,14 @@ jobs:
             -b:a 192k \
             -shortest \
             video.mp4
+
+      - name: Check final video
+        run: |
+          ffprobe -v error \
+            -show_format \
+            -show_streams \
+            video.mp4
+          ls -lh video.mp4
 
       - name: Save video
         uses: actions/upload-artifact@v4
