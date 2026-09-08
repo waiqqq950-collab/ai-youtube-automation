@@ -20,8 +20,10 @@ jobs:
           ls -lh voice.mp3
 
       - name: Check audio
-        run: |
-          ffprobe -v error voice.mp3
+  run: |
+    file voice.mp3
+    ls -lh voice.mp3
+    ffprobe -v error -show_format -show_streams voice.mp3
       - name: Create visual video
         run: |
           ffmpeg -y \
