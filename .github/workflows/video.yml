@@ -15,7 +15,7 @@ jobs:
 
       - name: Download AI voice
         run: |
-          curl -fL "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" -o voice.mp3
+        curl -L "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" -o voice.mp3
           file voice.mp3
           ls -lh voice.mp3
 
