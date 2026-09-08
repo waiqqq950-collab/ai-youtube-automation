@@ -22,8 +22,7 @@ jobs:
       - name: Check audio
         run: |
           ffprobe -v error voice.mp3
-
-           - name: Create visual video
+   - name: Create visual video
         run: |
           ffmpeg -y \
             -f lavfi \
