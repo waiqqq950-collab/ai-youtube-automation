@@ -53,7 +53,14 @@ jobs:
             -show_streams \
             video.mp4
           ls -lh video.mp4
-
+      - name: Upload video to YouTube
+        run: |
+          curl -sS \
+            -X POST \
+            -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
+            -H "Content-Type: video/mp4" \
+            --data-binary "@video.mp4" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload"
       - name: Save video
         uses: actions/upload-artifact@v4
         with:
