@@ -14,7 +14,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-
+      - name: Get daily AI script
+        run: |
+          curl -L \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" \
+            -o script.txt
+          echo "AI script created:"
+          cat script.txt
       - name: Download AI voice
         run: |
           curl -L \
