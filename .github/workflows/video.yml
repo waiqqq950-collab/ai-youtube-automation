@@ -30,10 +30,7 @@ jobs:
           echo "Voice downloaded:"
           file voice.mp3
           ls -lh voice.mp3
-        run: |
-          curl -L \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
-            -o voice.mp3
+       
           cat voice.mp3
       - name: Check downloaded audio
         run: |
