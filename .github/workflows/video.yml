@@ -21,9 +21,11 @@ jobs:
             -o script.txt
           echo "AI script created:"
           cat script.txt
-      - name: Download AI voice
+           - name: Download AI voice
         run: |
-          curl -L \
+          curl -sS -X POST \
+            -H "Content-Type: text/plain" \
+            --data-binary "@script.txt" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
             -o voice.mp3
 
