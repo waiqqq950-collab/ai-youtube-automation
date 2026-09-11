@@ -5,25 +5,47 @@ on:
 
   schedule:
     - cron: "0 2 * * *"
+
 jobs:
   create-video:
     runs-on: ubuntu-latest
 
     steps:
+
+      # =========================
+      # INSTALL FFMPEG
+      # =========================
+
       - name: Install ffmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+
+      # =========================
+      # GET DAILY AI SCRIPT
+      # =========================
+
       - name: Get daily AI script
         run: |
-          curl -L \
+          curl -fL \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" \
             -o script.txt
+
           echo "AI script created:"
           cat script.txt
+
+          echo ""
+          echo "Word count:"
+          wc -w script.txt
+
+      # =========================
+      # DOWNLOAD AI VOICE
+      # =========================
+
       - name: Download AI voice
         run: |
-          curl -sS -X POST \
+          curl -fS \
+            -X POST \
             -H "Content-Type: text/plain" \
             --data-binary "@script.txt" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
@@ -32,17 +54,22 @@ jobs:
           echo "Voice downloaded:"
           file voice.mp3
           ls -lh voice.mp3
-       
-          cat voice.mp3
+
+      # =========================
+      # CHECK AUDIO
+      # =========================
+
       - name: Check downloaded audio
         run: |
-          echo "Checking audio file..."
-          file voice.mp3
-          ls -lh voice.mp3
-          ffprobe -v error \
-            -show_format \
-            -show_streams \
+          ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 \
             voice.mp3
+
+      # =========================
+      # CREATE VIDEO
+      # =========================
 
       - name: Create visual video
         run: |
@@ -50,8 +77,7 @@ jobs:
             -f lavfi \
             -i "color=c=0x111827:s=1920x1080:r=30" \
             -i voice.mp3 \
-            -filter_complex \
-            "[0:v]drawtext=text='AI TOOLS':fontcolor=white:fontsize=100:x=(w-text_w)/2:y=330,drawtext=text='WORK SMARTER':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=470,drawtext=text='Daily AI Productivity Tip':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=580[v]" \
+            -filter_complex "[0:v]drawtext=text='AI TOOLS':fontcolor=white:fontsize=100:x=(w-text_w)/2:y=330,drawtext=text='WORK SMARTER':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=470,drawtext=text='Daily AI Productivity Tip':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=580,drawbox=x=460:y=680:w=1000:h=8:color=white@0.25:t=fill,drawbox=x=460:y=680:w='min(1000,t*100)':h=8:color=white:t=fill[v]" \
             -map "[v]" \
             -map 1:a \
             -c:v libx264 \
@@ -61,21 +87,38 @@ jobs:
             -shortest \
             video.mp4
 
+      # =========================
+      # CHECK FINAL VIDEO
+      # =========================
+
       - name: Check final video
         run: |
-          ffprobe -v error \
-            -show_format \
-            -show_streams \
+          ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -show_entries stream=codec_name,width,height \
+            -of default=noprint_wrappers=1 \
             video.mp4
+
           ls -lh video.mp4
+
+      # =========================
+      # UPLOAD TO YOUTUBE
+      # =========================
+
       - name: Upload video to YouTube
         run: |
-          curl -sS \
+          curl -fS \
             -X POST \
             -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
             -H "Content-Type: video/mp4" \
             --data-binary "@video.mp4" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload"
+
+      # =========================
+      # SAVE VIDEO ARTIFACT
+      # =========================
+
       - name: Save video
         uses: actions/upload-artifact@v4
         with:
