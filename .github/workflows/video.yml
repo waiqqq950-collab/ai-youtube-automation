@@ -21,7 +21,7 @@ jobs:
             -o script.txt
           echo "AI script created:"
           cat script.txt
-           - name: Download AI voice
+      - name: Download AI voice
         run: |
           curl -sS -X POST \
             -H "Content-Type: text/plain" \
