@@ -12,24 +12,14 @@ jobs:
 
     steps:
 
-      # =========================
-      # INSTALL FFMPEG
-      # =========================
-
       - name: Install ffmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      # =========================
-      # GET DAILY AI SCRIPT
-      # =========================
-
       - name: Get daily AI script
         run: |
-          curl -fL \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" \
-            -o script.txt
+          curl -fL "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" -o script.txt
 
           echo "AI script created:"
           cat script.txt
@@ -38,26 +28,17 @@ jobs:
           echo "Word count:"
           wc -w script.txt
 
-      # =========================
-      # DOWNLOAD AI VOICE
-      # =========================
-
       - name: Download AI voice
         run: |
-          curl -fS \
-            -X POST \
+          curl -fS -X POST \
             -H "Content-Type: text/plain" \
             --data-binary "@script.txt" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
-            -o 
+            -o voice.wav
 
           echo "Voice downloaded:"
           file voice.wav
           ls -lh voice.wav
-
-      # =========================
-      # CHECK AUDIO
-      # =========================
 
       - name: Check downloaded audio
         run: |
@@ -66,10 +47,6 @@ jobs:
             -show_entries format=duration \
             -of default=noprint_wrappers=1:nokey=1 \
             voice.wav
-
-      # =========================
-      # CREATE VIDEO
-      # =========================
 
       - name: Create visual video
         run: |
@@ -87,10 +64,6 @@ jobs:
             -shortest \
             video.mp4
 
-      # =========================
-      # CHECK FINAL VIDEO
-      # =========================
-
       - name: Check final video
         run: |
           ffprobe \
@@ -102,22 +75,13 @@ jobs:
 
           ls -lh video.mp4
 
-      # =========================
-      # UPLOAD TO YOUTUBE
-      # =========================
-
       - name: Upload video to YouTube
         run: |
-          curl -fS \
-            -X POST \
+          curl -fS -X POST \
             -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
             -H "Content-Type: video/mp4" \
             --data-binary "@video.mp4" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload"
-
-      # =========================
-      # SAVE VIDEO ARTIFACT
-      # =========================
 
       - name: Save video
         uses: actions/upload-artifact@v4
