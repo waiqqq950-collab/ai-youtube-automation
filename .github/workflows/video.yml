@@ -30,7 +30,7 @@ jobs:
 
       - name: Download AI voice
         run: |
-          curl -fS -X POST \
+          curl -sS -X POST \
             -H "Content-Type: text/plain" \
             --data-binary "@script.txt" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
