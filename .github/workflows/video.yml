@@ -28,18 +28,29 @@ jobs:
           echo "Word count:"
           wc -w script.txt
 
-      - name: Download AI voice
+          - name: Download AI voice
         run: |
-          curl -sS -X POST \
+          HTTP_CODE=$(curl -sS -X POST \
             -H "Content-Type: text/plain" \
             --data-binary "@script.txt" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
-            -o voice.wav
+            -o voice.wav \
+            -w "%{http_code}" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio")
 
-          echo "Voice downloaded:"
+          echo "Worker HTTP status: $HTTP_CODE"
+
+          echo "Worker response:"
+          cat voice.wav
+
+          echo ""
+          echo "Downloaded file:"
           file voice.wav
           ls -lh voice.wav
 
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "AI audio generation failed."
+            exit 1
+          fi
       - name: Check downloaded audio
         run: |
           ffprobe \
