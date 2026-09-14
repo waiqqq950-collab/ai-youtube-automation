@@ -28,7 +28,7 @@ jobs:
           echo "Word count:"
           wc -w script.txt
 
-          - name: Download AI voice
+      - name: Download AI voice
         run: |
           HTTP_CODE=$(curl -sS -X POST \
             -H "Content-Type: text/plain" \
@@ -51,6 +51,7 @@ jobs:
             echo "AI audio generation failed."
             exit 1
           fi
+
       - name: Check downloaded audio
         run: |
           ffprobe \
