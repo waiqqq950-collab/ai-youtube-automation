@@ -33,7 +33,7 @@ jobs:
           HTTP_CODE=$(curl -sS -X POST \
             -H "Content-Type: text/plain" \
             --data-binary "@script.txt" \
-            -o voice.wav \
+            -o voice.mp3 \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio")
 
