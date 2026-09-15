@@ -87,7 +87,7 @@ jobs:
 
           ls -lh video.mp4
 
-            - name: Upload video to YouTube
+      - name: Upload video to YouTube
         run: |
           HTTP_CODE=$(curl -sS -X POST \
             -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
