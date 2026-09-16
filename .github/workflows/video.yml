@@ -275,10 +275,9 @@ jobs:
               overlay=
               x=(W-w)/2:
               y=500:
-              eof_action=repeat:
-              shortest=0
-              [v]
-            " \
+              eof_action=repeat
+             [v]
+             " \
             -map "[v]" \
             -map 2:a \
             -c:v libx264 \
