@@ -14,41 +14,28 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg jq python3 librsvg2-bin
+          sudo apt-get install -y ffmpeg librsvg2-bin
 
-      - name: Get AI content
+      - name: Get AI script
         run: |
+          echo "Getting AI script..."
+
           curl -fL \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-content" \
-            -o content.json
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" \
+            -o script.txt
 
-          echo "===== AI CONTENT ====="
-          cat content.json
-
-          echo "===== CHECK JSON ====="
-          jq empty content.json
-
-      - name: Extract content
-        run: |
-          jq -r '.title' content.json > title.txt
-          jq -r '.script' content.json > script.txt
-          jq -r '.description' content.json > description.txt
-          jq -r '.keywords | join(", ")' content.json > keywords.txt
-          jq -r '.tags | join(", ")' content.json > tags.txt
-
-          echo "===== TITLE ====="
-          cat title.txt
-
-          echo ""
-          echo "===== KEYWORDS ====="
-          cat keywords.txt
-
-          echo ""
-          echo "===== SCRIPT ====="
+          echo "===== AI SCRIPT ====="
           cat script.txt
+
+          if [ ! -s script.txt ]; then
+            echo "ERROR: Script is empty."
+            exit 1
+          fi
 
       - name: Create AI voice
         run: |
+          echo "Creating AI voice..."
+
           HTTP_CODE=$(curl -sS \
             -X POST \
             -H "Content-Type: text/plain" \
@@ -57,7 +44,7 @@ jobs:
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio")
 
-          echo "Audio HTTP status: $HTTP_CODE"
+          echo "Audio HTTP code: $HTTP_CODE"
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "===== AUDIO ERROR ====="
@@ -65,9 +52,13 @@ jobs:
             exit 1
           fi
 
-          echo "===== AUDIO FILE ====="
-          file voice.mp3
+          if [ ! -s voice.mp3 ]; then
+            echo "ERROR: Audio file is empty."
+            exit 1
+          fi
+
           ls -lh voice.mp3
+          file voice.mp3
 
       - name: Check audio
         run: |
@@ -80,48 +71,49 @@ jobs:
           echo "Audio duration: $DURATION seconds"
 
           if [ "$(printf "%.0f" "$DURATION")" -lt 3 ]; then
-            echo "Audio is too short."
+            echo "ERROR: Audio is too short."
             exit 1
           fi
 
       - name: Create AI presenter
         run: |
           cat > presenter.svg <<'SVG'
-          <svg xmlns="http://www.w3.org/2000/svg" width="700" height="1100" viewBox="0 0 700 1100">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="700"
+               height="1100"
+               viewBox="0 0 700 1100">
 
             <rect width="700" height="1100" fill="none"/>
 
-            <!-- glow -->
-            <circle cx="350" cy="330" r="270" fill="#102d49"/>
+            <circle cx="350" cy="330" r="280" fill="#102d49"/>
             <circle cx="350" cy="330" r="220" fill="#173c5c"/>
 
-            <!-- body -->
             <path d="M120 1030 Q150 720 350 690 Q550 720 580 1030 Z"
                   fill="#2563eb"/>
 
-            <!-- neck -->
-            <rect x="290" y="570" width="120" height="150" rx="35"
+            <rect x="290" y="570"
+                  width="120"
+                  height="150"
+                  rx="35"
                   fill="#d99a72"/>
 
-            <!-- face -->
-            <ellipse cx="350" cy="390" rx="170" ry="205"
+            <ellipse cx="350"
+                     cy="390"
+                     rx="170"
+                     ry="205"
                      fill="#e5a477"/>
 
-            <!-- hair -->
             <path d="M180 370 Q165 160 350 125 Q535 160 520 370
                      L475 300 Q440 210 350 205
                      Q260 210 225 300 Z"
                   fill="#202124"/>
 
-            <!-- ears -->
             <circle cx="180" cy="410" r="35" fill="#d99a72"/>
             <circle cx="520" cy="410" r="35" fill="#d99a72"/>
 
-            <!-- eyes -->
             <circle cx="290" cy="390" r="15" fill="#111827"/>
             <circle cx="410" cy="390" r="15" fill="#111827"/>
 
-            <!-- nose -->
             <path d="M350 405 L330 480 L370 480"
                   fill="none"
                   stroke="#a86443"
@@ -129,27 +121,32 @@ jobs:
                   stroke-linecap="round"
                   stroke-linejoin="round"/>
 
-            <!-- smile -->
             <path d="M295 510 Q350 555 405 510"
                   fill="none"
                   stroke="#7c3f2b"
                   stroke-width="12"
                   stroke-linecap="round"/>
 
-            <!-- shirt -->
             <path d="M170 760 Q350 690 530 760 L590 1030
                      L110 1030 Z"
                   fill="#2563eb"/>
 
-            <!-- laptop -->
-            <rect x="175" y="760" width="350" height="210" rx="18"
+            <rect x="175"
+                  y="760"
+                  width="350"
+                  height="210"
+                  rx="18"
                   fill="#111827"/>
 
-            <rect x="195" y="780" width="310" height="170" rx="10"
+            <rect x="195"
+                  y="780"
+                  width="310"
+                  height="170"
+                  rx="10"
                   fill="#38bdf8"/>
 
-            <!-- AI symbol -->
-            <text x="350" y="885"
+            <text x="350"
+                  y="885"
                   text-anchor="middle"
                   font-family="Arial"
                   font-size="85"
@@ -164,18 +161,20 @@ jobs:
 
           rsvg-convert presenter.svg -o presenter.png
 
-          echo "Presenter created:"
+          echo "Presenter created."
           ls -lh presenter.png
 
-      - name: Create vertical YouTube Short
+      - name: Create video
         run: |
+          echo "Creating 1080x1920 video..."
+
           ffmpeg -y \
             -f lavfi \
             -i "color=c=0x07111f:s=1080x1920:r=30" \
             -loop 1 \
             -i presenter.png \
             -i voice.mp3 \
-            -filter_complex "[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07111f:t=fill,drawbox=x=30:y=30:w=1020:h=1860:color=0x102d49:t=fill,drawbox=x=60:y=60:w=960:h=1800:color=0x07111f:t=fill,drawbox=x=0:y=0:w=1080:h=8:color=0x38bdf8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=56:x=(w-text_w)/2:y=105,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='WORK SMARTER WITH AI':fontcolor=0x38bdf8:fontsize=36:x=(w-text_w)/2:y=175,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='YOUR DAILY AI TIP':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=270,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='FAST • SIMPLE • USEFUL':fontcolor=0x38bdf8:fontsize=30:x=(w-text_w)/2:y=340[bg];[1:v]scale=600:943[host];[bg][host]overlay=240:490[v]" \
+            -filter_complex "[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07111f:t=fill,drawbox=x=30:y=30:w=1020:h=1860:color=0x102d49:t=fill,drawbox=x=60:y=60:w=960:h=1800:color=0x07111f:t=fill,drawbox=x=0:y=0:w=1080:h=8:color=0x38bdf8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=56:x=(w-text_w)/2:y=100,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='WORK SMARTER WITH AI':fontcolor=0x38bdf8:fontsize=34:x=(w-text_w)/2:y=175,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='DAILY AI PRODUCTIVITY TIP':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=250[bg];[1:v]scale=600:943[host];[bg][host]overlay=240:480[v]" \
             -map "[v]" \
             -map 2:a \
             -c:v libx264 \
@@ -188,9 +187,12 @@ jobs:
             -movflags +faststart \
             video.mp4
 
-      - name: Check final Short
+          echo "===== VIDEO CREATED ====="
+          ls -lh video.mp4
+
+      - name: Check final video
         run: |
-          echo "===== FINAL VIDEO ====="
+          echo "===== VIDEO INFO ====="
 
           ffprobe \
             -v error \
@@ -199,49 +201,35 @@ jobs:
             -of default=noprint_wrappers=1 \
             video.mp4
 
-          ls -lh video.mp4
-
-      - name: Upload Short to YouTube
+      - name: Upload to YouTube
         run: |
-          TITLE=$(cat title.txt | tr '\n' ' ' | tr -d '\r')
-          DESCRIPTION=$(cat description.txt | tr '\n' ' ' | tr -d '\r')
-          TAGS=$(cat tags.txt | tr '\n' ' ' | tr -d '\r')
-
-          echo "===== UPLOADING ====="
-          echo "Title: $TITLE"
-          echo "Tags: $TAGS"
+          echo "Uploading video to YouTube..."
 
           HTTP_CODE=$(curl -sS \
             -X POST \
             -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
             -H "Content-Type: video/mp4" \
-            -H "X-Video-Title: $TITLE" \
-            -H "X-Video-Description: $DESCRIPTION" \
-            -H "X-Video-Tags: $TAGS" \
             --data-binary "@video.mp4" \
             -o upload-response.txt \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload")
 
-          echo "Upload HTTP status: $HTTP_CODE"
+          echo "YouTube HTTP code: $HTTP_CODE"
 
           echo "===== YOUTUBE RESPONSE ====="
           cat upload-response.txt
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "YouTube upload failed."
+            echo "ERROR: YouTube upload failed."
             exit 1
           fi
 
-      - name: Save Short
+      - name: Save video
         uses: actions/upload-artifact@v4
         with:
           name: youtube-short
           path: |
             video.mp4
             script.txt
-            title.txt
-            keywords.txt
-            description.txt
-            tags.txt
+            voice.mp3
             presenter.png
