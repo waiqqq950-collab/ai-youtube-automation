@@ -2,7 +2,6 @@ name: Create YouTube Short
 
 on:
   workflow_dispatch:
-
   schedule:
     - cron: "0 2 * * *"
 
@@ -12,127 +11,66 @@ jobs:
 
     steps:
 
-      # ============================================
-      # 1. INSTALL TOOLS
-      # ============================================
-
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick fonts-dejavu jq python3
-
-      # ============================================
-      # 2. GET AI CONTENT
-      # ============================================
+          sudo apt-get install -y ffmpeg jq python3 librsvg2-bin
 
       - name: Get AI content
         run: |
-
           curl -fL \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-content" \
             -o content.json
 
-          echo "=============================="
-          echo "AI CONTENT"
-          echo "=============================="
-
+          echo "===== AI CONTENT ====="
           cat content.json
 
-          echo ""
-          echo "=============================="
-          echo "VALIDATING CONTENT"
-          echo "=============================="
-
+          echo "===== CHECK JSON ====="
           jq empty content.json
-
-          jq -e '.script' content.json > /dev/null
-
-          jq -e '.title' content.json > /dev/null
-
-          jq -e '.keywords' content.json > /dev/null
-
-          echo "Content OK."
-
-      # ============================================
-      # 3. EXTRACT CONTENT
-      # ============================================
 
       - name: Extract content
         run: |
+          jq -r '.title' content.json > title.txt
+          jq -r '.script' content.json > script.txt
+          jq -r '.description' content.json > description.txt
+          jq -r '.keywords | join(", ")' content.json > keywords.txt
+          jq -r '.tags | join(", ")' content.json > tags.txt
 
-          jq -r '.script' \
-            content.json > script.txt
-
-          jq -r '.title' \
-            content.json > title.txt
-
-          jq -r '.description' \
-            content.json > description.txt
-
-          jq -r '.keywords | join(", ")' \
-            content.json > keywords.txt
-
-          jq -r '.tags | join(", ")' \
-            content.json > tags.txt
-
-          echo "=============================="
-          echo "TITLE"
-          echo "=============================="
-
+          echo "===== TITLE ====="
           cat title.txt
 
           echo ""
-          echo "=============================="
-          echo "KEYWORDS"
-          echo "=============================="
-
+          echo "===== KEYWORDS ====="
           cat keywords.txt
 
           echo ""
-          echo "=============================="
-          echo "SCRIPT"
-          echo "=============================="
-
+          echo "===== SCRIPT ====="
           cat script.txt
-
-      # ============================================
-      # 4. CREATE AI VOICE
-      # ============================================
 
       - name: Create AI voice
         run: |
-
-          HTTP_CODE=$(curl -sS -X POST \
+          HTTP_CODE=$(curl -sS \
+            -X POST \
             -H "Content-Type: text/plain" \
             --data-binary "@script.txt" \
             -o voice.mp3 \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio")
 
-          echo "Worker HTTP status: $HTTP_CODE"
+          echo "Audio HTTP status: $HTTP_CODE"
 
           if [ "$HTTP_CODE" != "200" ]; then
-
-            echo "=============================="
-            echo "AI AUDIO ERROR"
-            echo "=============================="
-
+            echo "===== AUDIO ERROR ====="
             cat voice.mp3
-
             exit 1
           fi
 
+          echo "===== AUDIO FILE ====="
           file voice.mp3
-
           ls -lh voice.mp3
-
-      # ============================================
-      # 5. CHECK AUDIO
-      # ============================================
 
       - name: Check audio
         run: |
-
           DURATION=$(ffprobe \
             -v error \
             -show_entries format=duration \
@@ -146,338 +84,98 @@ jobs:
             exit 1
           fi
 
-      # ============================================
-      # 6. CREATE AI PRESENTER
-      # ============================================
-
       - name: Create AI presenter
         run: |
+          cat > presenter.svg <<'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" width="700" height="1100" viewBox="0 0 700 1100">
 
-          cat > presenter.svg <<'EOF'
-          <svg xmlns="http://www.w3.org/2000/svg"
-               width="700"
-               height="1100"
-               viewBox="0 0 700 1100">
+            <rect width="700" height="1100" fill="none"/>
 
-            <defs>
+            <!-- glow -->
+            <circle cx="350" cy="330" r="270" fill="#102d49"/>
+            <circle cx="350" cy="330" r="220" fill="#173c5c"/>
 
-              <linearGradient
-                id="shirt"
-                x1="0"
-                y1="0"
-                x2="1"
-                y2="1">
+            <!-- body -->
+            <path d="M120 1030 Q150 720 350 690 Q550 720 580 1030 Z"
+                  fill="#2563eb"/>
 
-                <stop
-                  offset="0%"
-                  stop-color="#2563eb"/>
+            <!-- neck -->
+            <rect x="290" y="570" width="120" height="150" rx="35"
+                  fill="#d99a72"/>
 
-                <stop
-                  offset="100%"
-                  stop-color="#7c3aed"/>
+            <!-- face -->
+            <ellipse cx="350" cy="390" rx="170" ry="205"
+                     fill="#e5a477"/>
 
-              </linearGradient>
+            <!-- hair -->
+            <path d="M180 370 Q165 160 350 125 Q535 160 520 370
+                     L475 300 Q440 210 350 205
+                     Q260 210 225 300 Z"
+                  fill="#202124"/>
 
-              <radialGradient id="face">
+            <!-- ears -->
+            <circle cx="180" cy="410" r="35" fill="#d99a72"/>
+            <circle cx="520" cy="410" r="35" fill="#d99a72"/>
 
-                <stop
-                  offset="0%"
-                  stop-color="#ffe0bd"/>
+            <!-- eyes -->
+            <circle cx="290" cy="390" r="15" fill="#111827"/>
+            <circle cx="410" cy="390" r="15" fill="#111827"/>
 
-                <stop
-                  offset="100%"
-                  stop-color="#e7b98f"/>
+            <!-- nose -->
+            <path d="M350 405 L330 480 L370 480"
+                  fill="none"
+                  stroke="#a86443"
+                  stroke-width="10"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"/>
 
-              </radialGradient>
+            <!-- smile -->
+            <path d="M295 510 Q350 555 405 510"
+                  fill="none"
+                  stroke="#7c3f2b"
+                  stroke-width="12"
+                  stroke-linecap="round"/>
 
-            </defs>
+            <!-- shirt -->
+            <path d="M170 760 Q350 690 530 760 L590 1030
+                     L110 1030 Z"
+                  fill="#2563eb"/>
 
-            <ellipse
-              cx="350"
-              cy="1030"
-              rx="260"
-              ry="35"
-              fill="#000000"
-              opacity="0.25"/>
+            <!-- laptop -->
+            <rect x="175" y="760" width="350" height="210" rx="18"
+                  fill="#111827"/>
 
-            <path
-              d="M110 1030
-                 C125 820 180 690 350 690
-                 C520 690 575 820 590 1030 Z"
-              fill="url(#shirt)"/>
+            <rect x="195" y="780" width="310" height="170" rx="10"
+                  fill="#38bdf8"/>
 
-            <rect
-              x="295"
-              y="610"
-              width="110"
-              height="130"
-              rx="45"
-              fill="#e7b98f"/>
+            <!-- AI symbol -->
+            <text x="350" y="885"
+                  text-anchor="middle"
+                  font-family="Arial"
+                  font-size="85"
+                  font-weight="bold"
+                  fill="white">AI</text>
 
-            <ellipse
-              cx="350"
-              cy="430"
-              rx="190"
-              ry="230"
-              fill="url(#face)"/>
-
-            <path
-              d="M165 410
-                 C150 190 245 105 355 110
-                 C495 115 555 225 530 405
-                 C485 335 425 300 350 300
-                 C275 300 220 340 165 410 Z"
-              fill="#182033"/>
-
-            <ellipse
-              cx="165"
-              cy="450"
-              rx="30"
-              ry="48"
-              fill="#e7b98f"/>
-
-            <ellipse
-              cx="535"
-              cy="450"
-              rx="30"
-              ry="48"
-              fill="#e7b98f"/>
-
-            <ellipse
-              cx="285"
-              cy="435"
-              rx="18"
-              ry="13"
-              fill="#111827"/>
-
-            <ellipse
-              cx="415"
-              cy="435"
-              rx="18"
-              ry="13"
-              fill="#111827"/>
-
-            <path
-              d="M250 390 Q285 370 315 390"
-              fill="none"
-              stroke="#182033"
-              stroke-width="16"
-              stroke-linecap="round"/>
-
-            <path
-              d="M385 390 Q415 370 450 390"
-              fill="none"
-              stroke="#182033"
-              stroke-width="16"
-              stroke-linecap="round"/>
-
-            <path
-              d="M350 440 L330 505 Q350 520 370 505"
-              fill="none"
-              stroke="#b78362"
-              stroke-width="10"
-              stroke-linecap="round"/>
-
-            <path
-              d="M290 550 Q350 595 410 550"
-              fill="none"
-              stroke="#9f4d50"
-              stroke-width="12"
-              stroke-linecap="round"/>
-
-            <path
-              d="M295 700 L350 770 L405 700"
-              fill="#ffffff"
-              opacity="0.9"/>
-
-            <rect
-              x="165"
-              y="790"
-              width="370"
-              height="210"
-              rx="18"
-              fill="#111827"
-              stroke="#38bdf8"
-              stroke-width="8"/>
-
-            <rect
-              x="190"
-              y="815"
-              width="320"
-              height="150"
-              rx="10"
-              fill="#0f172a"/>
-
-            <circle
-              cx="350"
-              cy="890"
-              r="48"
-              fill="none"
-              stroke="#22d3ee"
-              stroke-width="9"/>
-
-            <circle
-              cx="330"
-              cy="880"
-              r="7"
-              fill="#ffffff"/>
-
-            <circle
-              cx="370"
-              cy="880"
-              r="7"
-              fill="#ffffff"/>
-
-            <path
-              d="M330 910 Q350 925 370 910"
-              fill="none"
-              stroke="#ffffff"
-              stroke-width="7"
-              stroke-linecap="round"/>
-
-            <path
-              d="M125 1000
-                 L575 1000
-                 L610 1040
-                 L90 1040 Z"
-              fill="#374151"/>
+            <path d="M130 980 L570 980 L620 1030 L80 1030 Z"
+                  fill="#374151"/>
 
           </svg>
-          EOF
+          SVG
 
-          convert \
-            -background none \
-            presenter.svg \
-            presenter.png
+          rsvg-convert presenter.svg -o presenter.png
 
-          echo "Presenter created."
-
-          file presenter.png
-
+          echo "Presenter created:"
           ls -lh presenter.png
 
-      # ============================================
-      # 7. CREATE CAPTIONS
-      # ============================================
-
-      - name: Create captions
+      - name: Create vertical YouTube Short
         run: |
-
-          python3 <<'PY'
-
-          import re
-          import subprocess
-
-          text = open(
-              "script.txt",
-              encoding="utf-8"
-          ).read().strip()
-
-          duration = float(
-              subprocess.check_output([
-                  "ffprobe",
-                  "-v",
-                  "error",
-                  "-show_entries",
-                  "format=duration",
-                  "-of",
-                  "default=noprint_wrappers=1:nokey=1",
-                  "voice.mp3"
-              ]).decode().strip()
-          )
-
-          words = text.split()
-
-          chunk_size = 6
-
-          chunks = [
-              words[i:i+chunk_size]
-              for i in range(
-                  0,
-                  len(words),
-                  chunk_size
-              )
-          ]
-
-          def timestamp(seconds):
-
-              ms = int(
-                  seconds * 1000
-              )
-
-              h = ms // 3600000
-
-              ms %= 3600000
-
-              m = ms // 60000
-
-              ms %= 60000
-
-              s = ms // 1000
-
-              ms %= 1000
-
-              return (
-                  f"{h:02d}:"
-                  f"{m:02d}:"
-                  f"{s:02d},"
-                  f"{ms:03d}"
-              )
-
-          per_chunk = duration / max(
-              len(chunks),
-              1
-          )
-
-          with open(
-              "captions.srt",
-              "w",
-              encoding="utf-8"
-          ) as f:
-
-              for i, chunk in enumerate(chunks):
-
-                  start = i * per_chunk
-
-                  end = min(
-                      (i + 1) * per_chunk,
-                      duration
-                  )
-
-                  f.write(
-                      f"{i+1}\n"
-                  )
-
-                  f.write(
-                      f"{timestamp(start)} --> "
-                      f"{timestamp(end)}\n"
-                  )
-
-                  f.write(
-                      " ".join(chunk)
-                  )
-
-                  f.write("\n\n")
-
-          print("Captions created.")
-
-          PY
-
-          cat captions.srt
-
-      # ============================================
-      # 8. CREATE SHORT VIDEO
-      # ============================================       - name: Create vertical YouTube Short
-         run: |
-          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3)
-
           ffmpeg -y \
             -f lavfi \
             -i "color=c=0x07111f:s=1080x1920:r=30" \
             -loop 1 \
             -i presenter.png \
             -i voice.mp3 \
-            -filter_complex "[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07111f:t=fill,drawbox=x=30:y=30:w=1020:h=1860:color=0x102d49:t=fill,drawbox=x=60:y=60:w=960:h=1800:color=0x07111f:t=fill,drawbox=x=0:y=0:w=1080:h=8:color=0x38bdf8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=56:x=(w-text_w)/2:y=105,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='WORK SMARTER WITH AI':fontcolor=0x38bdf8:fontsize=36:x=(w-text_w)/2:y=175,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='YOUR DAILY AI TIP':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=270[bg];[1:v]scale=600:943[host];[bg][host]overlay=240:490[v]" \
+            -filter_complex "[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07111f:t=fill,drawbox=x=30:y=30:w=1020:h=1860:color=0x102d49:t=fill,drawbox=x=60:y=60:w=960:h=1800:color=0x07111f:t=fill,drawbox=x=0:y=0:w=1080:h=8:color=0x38bdf8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=56:x=(w-text_w)/2:y=105,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='WORK SMARTER WITH AI':fontcolor=0x38bdf8:fontsize=36:x=(w-text_w)/2:y=175,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='YOUR DAILY AI TIP':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=270,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='FAST • SIMPLE • USEFUL':fontcolor=0x38bdf8:fontsize=30:x=(w-text_w)/2:y=340[bg];[1:v]scale=600:943[host];[bg][host]overlay=240:490[v]" \
             -map "[v]" \
             -map 2:a \
             -c:v libx264 \
@@ -486,20 +184,13 @@ jobs:
             -pix_fmt yuv420p \
             -c:a aac \
             -b:a 128k \
-            -t "$DURATION" \
+            -shortest \
             -movflags +faststart \
             video.mp4
 
-      # ============================================
-      # 9. CHECK VIDEO
-      # ============================================
-
       - name: Check final Short
         run: |
-
-          echo "=============================="
-          echo "FINAL VIDEO"
-          echo "=============================="
+          echo "===== FINAL VIDEO ====="
 
           ffprobe \
             -v error \
@@ -510,27 +201,18 @@ jobs:
 
           ls -lh video.mp4
 
-      # ============================================
-      # 10. UPLOAD TO YOUTUBE
-      # ============================================
-
       - name: Upload Short to YouTube
         run: |
+          TITLE=$(cat title.txt | tr '\n' ' ' | tr -d '\r')
+          DESCRIPTION=$(cat description.txt | tr '\n' ' ' | tr -d '\r')
+          TAGS=$(cat tags.txt | tr '\n' ' ' | tr -d '\r')
 
-          TITLE=$(cat title.txt)
+          echo "===== UPLOADING ====="
+          echo "Title: $TITLE"
+          echo "Tags: $TAGS"
 
-          DESCRIPTION=$(cat description.txt)
-
-          TAGS=$(cat tags.txt)
-
-          echo "=============================="
-          echo "UPLOADING"
-          echo "=============================="
-
-          echo "Title:"
-          echo "$TITLE"
-
-          HTTP_CODE=$(curl -sS -X POST \
+          HTTP_CODE=$(curl -sS \
+            -X POST \
             -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
             -H "Content-Type: video/mp4" \
             -H "X-Video-Title: $TITLE" \
@@ -541,22 +223,15 @@ jobs:
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload")
 
-          echo "Worker HTTP status: $HTTP_CODE"
+          echo "Upload HTTP status: $HTTP_CODE"
 
-          echo "=============================="
-          echo "YOUTUBE RESPONSE"
-          echo "=============================="
-
+          echo "===== YOUTUBE RESPONSE ====="
           cat upload-response.txt
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "YouTube upload failed."
             exit 1
           fi
-
-      # ============================================
-      # 11. SAVE ARTIFACT
-      # ============================================
 
       - name: Save Short
         uses: actions/upload-artifact@v4
@@ -567,4 +242,6 @@ jobs:
             script.txt
             title.txt
             keywords.txt
-            captions.srt
+            description.txt
+            tags.txt
+            presenter.png
