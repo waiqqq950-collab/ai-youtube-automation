@@ -199,16 +199,8 @@ jobs:
           file presenter.png
           ls -lh presenter.png
 
-      - name: Create vertical YouTube Short
+           - name: Create vertical YouTube Short
         run: |
-          DURATION=$(ffprobe \
-            -v error \
-            -show_entries format=duration \
-            -of default=noprint_wrappers=1:nokey=1 \
-            voice.mp3)
-
-          echo "Video duration: $DURATION seconds"
-
           ffmpeg -y \
             -f lavfi \
             -i "color=c=0x07111f:s=1080x1920:r=30" \
@@ -216,68 +208,9 @@ jobs:
             -i presenter.png \
             -i voice.mp3 \
             -filter_complex "
-              [0:v]
-              drawbox=x=0:y=0:w=1080:h=1920:
-              color=0x07111f:t=fill,
-              drawbox=x=35:y=35:w=1010:h=1850:
-              color=0x0f2a44@0.8:t=fill,
-              drawbox=x=65:y=65:w=950:h=1790:
-              color=0x07111f@0.95:t=fill,
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='AI TOOLS DAILY':
-              fontcolor=white:
-              fontsize=58:
-              x=(w-text_w)/2:
-              y=105,
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='WORK SMARTER WITH AI':
-              fontcolor=0x38bdf8:
-              fontsize=38:
-              x=(w-text_w)/2:
-              y=185,
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='SAVE TIME':
-              fontcolor=white:
-              fontsize=74:
-              x=(w-text_w)/2:
-              y=310:
-              enable='between(t,0,4)',
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='AI AUTOMATION':
-              fontcolor=white:
-              fontsize=68:
-              x=(w-text_w)/2:
-              y=310:
-              enable='between(t,4,8)',
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='WORK SMARTER':
-              fontcolor=white:
-              fontsize=72:
-              x=(w-text_w)/2:
-              y=310:
-              enable='gte(t,8)',
-              drawbox=
-              x=95:y=415:w=890:h=5:
-              color=0x38bdf8@0.8:t=fill
-              [bg];
-
-              [1:v]
-              scale=650:1020:
-              format=rgba:
-              [presenter];
-
-              [bg][presenter]
-              overlay=
-              x=(W-w)/2:
-              y=500:
-              eof_action=repeat
-             [v]
-             " \
+              [1:v]scale=650:1020[presenter];
+              [0:v][presenter]overlay=215:500[v]
+            " \
             -map "[v]" \
             -map 2:a \
             -c:v libx264 \
