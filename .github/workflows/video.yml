@@ -468,18 +468,9 @@ jobs:
       # ============================================
       # 8. CREATE SHORT VIDEO
       # ============================================
-
-      - name: Create vertical YouTube Short
+               - name: Create vertical YouTube Short
         run: |
-
-          DURATION=$(ffprobe \
-            -v error \
-            -show_entries format=duration \
-            -of default=noprint_wrappers=1:nokey=1 \
-            voice.mp3)
-
-          echo "Creating Short..."
-          echo "Duration: $DURATION"
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3)
 
           ffmpeg -y \
             -f lavfi \
@@ -487,83 +478,7 @@ jobs:
             -loop 1 \
             -i presenter.png \
             -i voice.mp3 \
-            -filter_complex "
-
-              [0:v]
-              drawbox=
-              x=0:y=0:w=1080:h=1920:
-              color=0x07111f:t=fill,
-
-              drawbox=
-              x=30:y=30:w=1020:h=1860:
-              color=0x102d49:t=fill,
-
-              drawbox=
-              x=60:y=60:w=960:h=1800:
-              color=0x07111f:t=fill,
-
-              drawbox=
-              x=0:y=0:w=1080:h=8:
-              color=0x38bdf8:t=fill,
-
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='AI TOOLS DAILY':
-              fontcolor=white:
-              fontsize=56:
-              x=(w-text_w)/2:
-              y=105,
-
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='WORK SMARTER WITH AI':
-              fontcolor=0x38bdf8:
-              fontsize=36:
-              x=(w-text_w)/2:
-              y=175,
-
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='YOUR DAILY AI TIP':
-              fontcolor=white:
-              fontsize=42:
-              x=(w-text_w)/2:
-              y=270,
-
-              drawtext=
-              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
-              text='FAST • SIMPLE • USEFUL':
-              fontcolor=0x38bdf8:
-              fontsize=30:
-              x=(w-text_w)/2:
-              y=340,
-
-              [bg];
-
-              [1:v]
-              scale=600:943:
-              format=rgba:
-              [host];
-
-              [host]
-              setpts=PTS/1.03:
-              [host2];
-
-              [bg][host2]
-              overlay=
-              x=240:
-              y=490:
-              eof_action=repeat:
-              [withhost];
-
-              [withhost]
-              subtitles=
-              captions.srt:
-              force_style=
-              'FontName=DejaVu Sans,FontSize=26,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=3,Shadow=1,Alignment=2,MarginV=250':
-              [v]
-
-            " \
+            -filter_complex "[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07111f:t=fill,drawbox=x=30:y=30:w=1020:h=1860:color=0x102d49:t=fill,drawbox=x=60:y=60:w=960:h=1800:color=0x07111f:t=fill,drawbox=x=0:y=0:w=1080:h=8:color=0x38bdf8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=56:x=(w-text_w)/2:y=105,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='WORK SMARTER WITH AI':fontcolor=0x38bdf8:fontsize=36:x=(w-text_w)/2:y=175,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='YOUR DAILY AI TIP':fontcolor=white:fontsize=42:x=(w-text_w)/2:y=270[bg];[1:v]scale=600:943[host];[bg][host]overlay=240:490[v]" \
             -map "[v]" \
             -map 2:a \
             -c:v libx264 \
@@ -572,11 +487,9 @@ jobs:
             -pix_fmt yuv420p \
             -c:a aac \
             -b:a 128k \
-            -shortest \
+            -t "$DURATION" \
             -movflags +faststart \
             video.mp4
-
-          echo "Video created."
 
       # ============================================
       # 9. CHECK VIDEO
