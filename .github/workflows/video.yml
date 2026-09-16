@@ -1,44 +1,120 @@
-name: Create YouTube Short
+name: AI Tools Daily - Professional Shorts
 
 on:
   workflow_dispatch:
   schedule:
     - cron: "0 2 * * *"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-tools-daily
+  cancel-in-progress: false
+
 jobs:
   create-video:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
 
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg librsvg2-bin
+          sudo apt-get install -y ffmpeg python3-pil fonts-dejavu
+
+          ffmpeg -version | head -n 1
+          python3 --version
+
+      # =====================================================
+      # AI SCRIPT
+      # =====================================================
 
       - name: Get AI script
         run: |
-          echo "Getting AI script..."
+          set -e
 
-          curl -fL \
+          curl -fsSL \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" \
             -o script.txt
+
+          test -s script.txt
 
           echo "===== AI SCRIPT ====="
           cat script.txt
 
-          if [ ! -s script.txt ]; then
-            echo "ERROR: Script is empty."
-            exit 1
-          fi
+      # =====================================================
+      # AI TITLE
+      # =====================================================
+
+      - name: Get AI title
+        run: |
+          set -e
+
+          curl -fsSL \
+            -X POST \
+            -H "Content-Type: text/plain; charset=utf-8" \
+            --data-binary "@script.txt" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-title" \
+            -o title.txt
+
+          test -s title.txt
+
+          echo "===== AI TITLE ====="
+          cat title.txt
+
+      # =====================================================
+      # AI DESCRIPTION
+      # =====================================================
+
+      - name: Get AI description
+        run: |
+          set -e
+
+          curl -fsSL \
+            -X POST \
+            -H "Content-Type: text/plain; charset=utf-8" \
+            --data-binary "@script.txt" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-description" \
+            -o description.txt
+
+          test -s description.txt
+
+          echo "===== DESCRIPTION ====="
+          cat description.txt
+
+      # =====================================================
+      # AI TAGS
+      # =====================================================
+
+      - name: Get AI tags
+        run: |
+          set -e
+
+          curl -fsSL \
+            -X POST \
+            -H "Content-Type: text/plain; charset=utf-8" \
+            --data-binary "@script.txt" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-tags" \
+            -o tags.txt
+
+          test -s tags.txt
+
+          echo "===== TAGS ====="
+          cat tags.txt
+
+      # =====================================================
+      # AI VOICE
+      # =====================================================
 
       - name: Create AI voice
         run: |
-          echo "Creating AI voice..."
+          set -e
 
           HTTP_CODE=$(curl -sS \
             -X POST \
-            -H "Content-Type: text/plain" \
+            -H "Content-Type: text/plain; charset=utf-8" \
             --data-binary "@script.txt" \
             -o voice.mp3 \
             -w "%{http_code}" \
@@ -48,20 +124,22 @@ jobs:
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "===== AUDIO ERROR ====="
-            cat voice.mp3
+            cat voice.mp3 || true
             exit 1
           fi
 
-          if [ ! -s voice.mp3 ]; then
-            echo "ERROR: Audio file is empty."
-            exit 1
-          fi
+          test -s voice.mp3
 
-          ls -lh voice.mp3
           file voice.mp3
 
-      - name: Check audio
+      # =====================================================
+      # AUDIO DURATION
+      # =====================================================
+
+      - name: Measure voice
         run: |
+          set -e
+
           DURATION=$(ffprobe \
             -v error \
             -show_entries format=duration \
@@ -70,166 +148,444 @@ jobs:
 
           echo "Audio duration: $DURATION seconds"
 
-          if [ "$(printf "%.0f" "$DURATION")" -lt 3 ]; then
-            echo "ERROR: Audio is too short."
-            exit 1
-          fi
+          python3 - "$DURATION" <<'PY'
+          import sys
 
-      - name: Create AI presenter
+          duration = float(sys.argv[1])
+
+          if duration < 5:
+              raise SystemExit("ERROR: Audio is too short.")
+
+          if duration > 70:
+              raise SystemExit("ERROR: Audio is too long.")
+          PY
+
+          printf '%s' "$DURATION" > duration.txt
+
+      # =====================================================
+      # CREATE SCENES + CAPTIONS
+      # =====================================================
+
+      - name: Build scenes and captions
         run: |
-          cat > presenter.svg <<'SVG'
-          <svg xmlns="http://www.w3.org/2000/svg"
-               width="700"
-               height="1100"
-               viewBox="0 0 700 1100">
+          set -e
 
-            <rect width="700" height="1100" fill="none"/>
+          python3 <<'PY'
+          from PIL import Image, ImageDraw, ImageFont
+          import math
+          import re
+          import os
 
-            <circle cx="350" cy="330" r="280" fill="#102d49"/>
-            <circle cx="350" cy="330" r="220" fill="#173c5c"/>
+          W = 1080
+          H = 1920
 
-            <path d="M120 1030 Q150 720 350 690 Q550 720 580 1030 Z"
-                  fill="#2563eb"/>
+          def get_font(size, bold=False):
+              if bold:
+                  path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+              else:
+                  path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-            <rect x="290" y="570"
-                  width="120"
-                  height="150"
-                  rx="35"
-                  fill="#d99a72"/>
+              return ImageFont.truetype(path, size)
 
-            <ellipse cx="350"
-                     cy="390"
-                     rx="170"
-                     ry="205"
-                     fill="#e5a477"/>
+          big_font = get_font(62, True)
+          small_font = get_font(30, False)
 
-            <path d="M180 370 Q165 160 350 125 Q535 160 520 370
-                     L475 300 Q440 210 350 205
-                     Q260 210 225 300 Z"
-                  fill="#202124"/>
+          with open("script.txt", encoding="utf-8") as f:
+              script = f.read().strip()
 
-            <circle cx="180" cy="410" r="35" fill="#d99a72"/>
-            <circle cx="520" cy="410" r="35" fill="#d99a72"/>
+          with open("title.txt", encoding="utf-8") as f:
+              title = f.read().strip()
 
-            <circle cx="290" cy="390" r="15" fill="#111827"/>
-            <circle cx="410" cy="390" r="15" fill="#111827"/>
+          words = re.findall(r"\S+", script)
 
-            <path d="M350 405 L330 480 L370 480"
-                  fill="none"
-                  stroke="#a86443"
-                  stroke-width="10"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"/>
+          labels = [
+              "THE HOOK",
+              "THE AI TOOL",
+              "HOW IT WORKS",
+              "TRY THIS",
+              "THE BENEFIT",
+              "QUICK TAKEAWAY"
+          ]
 
-            <path d="M295 510 Q350 555 405 510"
-                  fill="none"
-                  stroke="#7c3f2b"
-                  stroke-width="12"
-                  stroke-linecap="round"/>
+          chunks = []
 
-            <path d="M170 760 Q350 690 530 760 L590 1030
-                     L110 1030 Z"
-                  fill="#2563eb"/>
+          for i in range(6):
+              start = round(i * len(words) / 6)
+              end = round((i + 1) * len(words) / 6)
+              chunks.append(" ".join(words[start:end]))
 
-            <rect x="175"
-                  y="760"
-                  width="350"
-                  height="210"
-                  rx="18"
-                  fill="#111827"/>
+          for i in range(6):
 
-            <rect x="195"
-                  y="780"
-                  width="310"
-                  height="170"
-                  rx="10"
-                  fill="#38bdf8"/>
+              image = Image.new(
+                  "RGB",
+                  (W, H),
+                  (7, 14, 28)
+              )
 
-            <text x="350"
-                  y="885"
-                  text-anchor="middle"
-                  font-family="Arial"
-                  font-size="85"
-                  font-weight="bold"
-                  fill="white">AI</text>
+              draw = ImageDraw.Draw(image)
 
-            <path d="M130 980 L570 980 L620 1030 L80 1030 Z"
-                  fill="#374151"/>
+              draw.rounded_rectangle(
+                  (55, 55, W - 55, H - 55),
+                  radius=55,
+                  fill=(13, 27, 49),
+                  outline=(55, 87, 130),
+                  width=4
+              )
 
-          </svg>
-          SVG
+              draw.rounded_rectangle(
+                  (85, 110, W - 85, 205),
+                  radius=28,
+                  fill=(20, 45, 76)
+              )
 
-          rsvg-convert presenter.svg -o presenter.png
+              draw.text(
+                  (120, 137),
+                  labels[i],
+                  font=small_font,
+                  fill=(190, 220, 255)
+              )
 
-          echo "Presenter created."
-          ls -lh presenter.png
+              # Progress dots
 
-      - name: Create video
+              for j in range(6):
+
+                  x = 120 + j * 45
+
+                  radius = 15 if j == i else 10
+
+                  draw.ellipse(
+                      (
+                          x - radius,
+                          260 - radius,
+                          x + radius,
+                          260 + radius
+                      ),
+                      fill=(
+                          (120, 190, 255)
+                          if j == i
+                          else (55, 78, 105)
+                      )
+                  )
+
+              text = chunks[i].strip()
+
+              if not text:
+                  text = "One useful AI idea you can use today."
+
+              # Wrap text
+
+              lines = []
+
+              current = ""
+
+              for word in text.split():
+
+                  test = (
+                      current + " " + word
+                  ).strip()
+
+                  width = draw.textbbox(
+                      (0, 0),
+                      test,
+                      font=big_font
+                  )[2]
+
+                  if width > 850:
+
+                      if current:
+                          lines.append(current)
+
+                      current = word
+
+                  else:
+                      current = test
+
+              if current:
+                  lines.append(current)
+
+              y = 470
+
+              for line in lines[:8]:
+
+                  draw.text(
+                      (120, y),
+                      line,
+                      font=big_font,
+                      fill=(245, 248, 255)
+                  )
+
+                  y += 90
+
+              # Branding
+
+              draw.text(
+                  (120, 1700),
+                  "AI TOOLS DAILY",
+                  font=small_font,
+                  fill=(150, 180, 215)
+              )
+
+              draw.text(
+                  (120, 1760),
+                  title[:48],
+                  font=small_font,
+                  fill=(105, 160, 220)
+              )
+
+              image.save(
+                  f"scene{i + 1}.png"
+              )
+
+          # =================================================
+          # CAPTIONS
+          # =================================================
+
+          duration = float(
+              open("duration.txt").read().strip()
+          )
+
+          caption_groups = []
+
+          for i in range(0, len(words), 5):
+              caption_groups.append(
+                  " ".join(words[i:i + 5])
+              )
+
+          def ass_time(seconds):
+
+              hours = int(seconds // 3600)
+
+              seconds -= hours * 3600
+
+              minutes = int(seconds // 60)
+
+              seconds -= minutes * 60
+
+              whole = int(seconds)
+
+              centiseconds = int(
+                  round(
+                      (seconds - whole) * 100
+                  )
+              )
+
+              if centiseconds >= 100:
+                  whole += 1
+                  centiseconds = 0
+
+              return (
+                  f"{hours}:"
+                  f"{minutes:02d}:"
+                  f"{whole:02d}."
+                  f"{centiseconds:02d}"
+              )
+
+          with open(
+              "captions.ass",
+              "w",
+              encoding="utf-8"
+          ) as f:
+
+              f.write(
+                  "[Script Info]\n"
+              )
+
+              f.write(
+                  "ScriptType: v4.00+\n"
+              )
+
+              f.write(
+                  "PlayResX: 1080\n"
+              )
+
+              f.write(
+                  "PlayResY: 1920\n\n"
+              )
+
+              f.write(
+                  "[V4+ Styles]\n"
+              )
+
+              f.write(
+                  "Format: Name, Fontname, Fontsize, "
+                  "PrimaryColour, SecondaryColour, "
+                  "OutlineColour, BackColour, Bold, "
+                  "Italic, Underline, StrikeOut, "
+                  "ScaleX, ScaleY, Spacing, Angle, "
+                  "BorderStyle, Outline, Shadow, "
+                  "Alignment, MarginL, MarginR, "
+                  "MarginV, Encoding\n"
+              )
+
+              f.write(
+                  "Style: Default,DejaVu Sans,54,"
+                  "&H00FFFFFF,&H00FFFFFF,"
+                  "&H0010182B,&H8010182B,"
+                  "-1,0,0,0,100,100,0,0,1,5,2,"
+                  "2,80,80,250,1\n\n"
+              )
+
+              f.write(
+                  "[Events]\n"
+              )
+
+              f.write(
+                  "Format: Layer, Start, End, Style, "
+                  "Name, MarginL, MarginR, MarginV, "
+                  "Effect, Text\n"
+              )
+
+              step = (
+                  duration /
+                  max(1, len(caption_groups))
+              )
+
+              for i, text in enumerate(
+                  caption_groups
+              ):
+
+                  start = i * step
+
+                  end = min(
+                      duration,
+                      (i + 1) * step
+                  )
+
+                  text = (
+                      text
+                      .replace("{", "(")
+                      .replace("}", ")")
+                  )
+
+                  f.write(
+                      "Dialogue: 0,"
+                      + ass_time(start)
+                      + ","
+                      + ass_time(end)
+                      + ",Default,,0,0,0,,"
+                      + text
+                      + "\n"
+                  )
+
+          print("Scenes and captions created.")
+
+          PY
+
+          ls -lh scene*.png
+          ls -lh captions.ass
+
+      # =====================================================
+      # RENDER 1080x1920
+      # =====================================================
+
+      - name: Render 1080x1920 video
         run: |
-          echo "Creating 1080x1920 video..."
+          set -e
+
+          DURATION=$(cat duration.txt)
+
+          SEGMENT=$(python3 -c \
+            "print(float('$DURATION') / 6.0)")
 
           ffmpeg -y \
-            -f lavfi \
-            -i "color=c=0x07111f:s=1080x1920:r=30" \
             -loop 1 \
-            -i presenter.png \
+            -t "$SEGMENT" \
+            -i scene1.png \
+            -loop 1 \
+            -t "$SEGMENT" \
+            -i scene2.png \
+            -loop 1 \
+            -t "$SEGMENT" \
+            -i scene3.png \
+            -loop 1 \
+            -t "$SEGMENT" \
+            -i scene4.png \
+            -loop 1 \
+            -t "$SEGMENT" \
+            -i scene5.png \
+            -loop 1 \
+            -t "$DURATION" \
+            -i scene6.png \
             -i voice.mp3 \
-            -filter_complex "[0:v]drawbox=x=0:y=0:w=1080:h=1920:color=0x07111f:t=fill,drawbox=x=30:y=30:w=1020:h=1860:color=0x102d49:t=fill,drawbox=x=60:y=60:w=960:h=1800:color=0x07111f:t=fill,drawbox=x=0:y=0:w=1080:h=8:color=0x38bdf8:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=56:x=(w-text_w)/2:y=100,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='WORK SMARTER WITH AI':fontcolor=0x38bdf8:fontsize=34:x=(w-text_w)/2:y=175,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='DAILY AI PRODUCTIVITY TIP':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=250[bg];[1:v]scale=600:943[host];[bg][host]overlay=240:480[v]" \
+            -filter_complex "[0:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v0];[1:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v1];[2:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v2];[3:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v3];[4:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v4];[5:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v5];[v0][v1][v2][v3][v4][v5]concat=n=6:v=1:a=0[vc];[vc]subtitles=captions.ass:fontsdir=/usr/share/fonts/truetype/dejavu[v]" \
             -map "[v]" \
-            -map 2:a \
+            -map 6:a \
+            -t "$DURATION" \
             -c:v libx264 \
             -preset veryfast \
-            -crf 22 \
+            -crf 21 \
             -pix_fmt yuv420p \
             -c:a aac \
-            -b:a 128k \
-            -shortest \
+            -b:a 160k \
             -movflags +faststart \
             video.mp4
 
-          echo "===== VIDEO CREATED ====="
-          ls -lh video.mp4
-
-      - name: Check final video
-        run: |
           echo "===== VIDEO INFO ====="
 
           ffprobe \
             -v error \
-            -show_entries format=duration \
-            -show_entries stream=codec_name,width,height \
+            -show_entries \
+            stream=width,height,codec_name \
             -of default=noprint_wrappers=1 \
             video.mp4
 
+          ls -lh video.mp4
+
+      # =====================================================
+      # YOUTUBE UPLOAD
+      # =====================================================
+
       - name: Upload to YouTube
         run: |
-          echo "Uploading video to YouTube..."
+          set -e
+
+          TITLE=$(cat title.txt | tr '\n' ' ' | sed 's/  */ /g')
+
+          DESCRIPTION=$(cat description.txt | tr '\n' ' ' | sed 's/  */ /g')
+
+          TAGS=$(cat tags.txt | tr '\n' ' ' | sed 's/  */ /g')
 
           HTTP_CODE=$(curl -sS \
             -X POST \
             -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
+            -H "X-Video-Title: $TITLE" \
+            -H "X-Video-Description: $DESCRIPTION" \
+            -H "X-Video-Tags: $TAGS" \
             -H "Content-Type: video/mp4" \
             --data-binary "@video.mp4" \
             -o upload-response.txt \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload")
 
-          echo "YouTube HTTP code: $HTTP_CODE"
+          echo "Upload HTTP code: $HTTP_CODE"
 
           echo "===== YOUTUBE RESPONSE ====="
+
           cat upload-response.txt
 
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "ERROR: YouTube upload failed."
             exit 1
           fi
 
-      - name: Save video
+      # =====================================================
+      # SAVE ARTIFACT
+      # =====================================================
+
+      - name: Save finished video
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-short
+          name: ai-tools-daily-short
           path: |
             video.mp4
             script.txt
+            title.txt
+            description.txt
+            tags.txt
             voice.mp3
-            presenter.png
+            captions.ass
+            scene1.png
+            scene2.png
+            scene3.png
+            scene4.png
+            scene5.png
+            scene6.png
