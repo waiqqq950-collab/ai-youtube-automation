@@ -212,20 +212,17 @@ jobs:
           ffmpeg -y \
             -f lavfi \
             -i "color=c=0x07111f:s=1080x1920:r=30" \
+            -loop 1 \
             -i presenter.png \
             -i voice.mp3 \
             -filter_complex "
-
               [0:v]
               drawbox=x=0:y=0:w=1080:h=1920:
               color=0x07111f:t=fill,
-
               drawbox=x=35:y=35:w=1010:h=1850:
               color=0x0f2a44@0.8:t=fill,
-
               drawbox=x=65:y=65:w=950:h=1790:
-              color=0x07111f@0.9:t=fill,
-
+              color=0x07111f@0.95:t=fill,
               drawtext=
               fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
               text='AI TOOLS DAILY':
@@ -233,7 +230,6 @@ jobs:
               fontsize=58:
               x=(w-text_w)/2:
               y=105,
-
               drawtext=
               fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
               text='WORK SMARTER WITH AI':
@@ -241,7 +237,6 @@ jobs:
               fontsize=38:
               x=(w-text_w)/2:
               y=185,
-
               drawtext=
               fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
               text='SAVE TIME':
@@ -250,7 +245,6 @@ jobs:
               x=(w-text_w)/2:
               y=310:
               enable='between(t,0,4)',
-
               drawtext=
               fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
               text='AI AUTOMATION':
@@ -259,7 +253,6 @@ jobs:
               x=(w-text_w)/2:
               y=310:
               enable='between(t,4,8)',
-
               drawtext=
               fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
               text='WORK SMARTER':
@@ -268,21 +261,23 @@ jobs:
               x=(w-text_w)/2:
               y=310:
               enable='gte(t,8)',
-
               drawbox=
-              x=95:y=415:w=890:h=4:
-              color=0x38bdf8@0.7:t=fill,
+              x=95:y=415:w=890:h=5:
+              color=0x38bdf8@0.8:t=fill
+              [bg];
 
               [1:v]
-              scale=570:895:
+              scale=650:1020:
+              format=rgba:
               [presenter];
 
-              [0:v][presenter]
+              [bg][presenter]
               overlay=
               x=(W-w)/2:
-              y=520:
+              y=500:
+              eof_action=repeat:
+              shortest=0
               [v]
-
             " \
             -map "[v]" \
             -map 2:a \
