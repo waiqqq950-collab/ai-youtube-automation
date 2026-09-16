@@ -467,9 +467,8 @@ jobs:
 
       # ============================================
       # 8. CREATE SHORT VIDEO
-      # ============================================
-               - name: Create vertical YouTube Short
-        run: |
+      # ============================================       - name: Create vertical YouTube Short
+         run: |
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3)
 
           ffmpeg -y \
