@@ -1,4 +1,4 @@
-name: Create YouTube Video
+name: Create YouTube Short
 
 on:
   workflow_dispatch:
@@ -12,20 +12,26 @@ jobs:
 
     steps:
 
-      - name: Install ffmpeg
+      - name: Install ffmpeg and image tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg imagemagick fonts-dejavu
 
       - name: Get daily AI script
         run: |
-          curl -fL "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" -o script.txt
+          curl -fL \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" \
+            -o script.txt
 
-          echo "AI script created:"
+          echo "=============================="
+          echo "AI SCRIPT"
+          echo "=============================="
           cat script.txt
 
           echo ""
-          echo "Word count:"
+          echo "=============================="
+          echo "WORD COUNT"
+          echo "=============================="
           wc -w script.txt
 
       - name: Download AI voice
@@ -39,45 +45,262 @@ jobs:
 
           echo "Worker HTTP status: $HTTP_CODE"
 
-          echo "Worker response:"
-          cat voice.mp3
-
-          echo ""
-          echo "Downloaded file:"
-          file voice.mp3
-          ls -lh voice.mp3
-
           if [ "$HTTP_CODE" != "200" ]; then
-            echo "AI audio generation failed."
+            echo "=============================="
+            echo "AI AUDIO ERROR"
+            echo "=============================="
+            cat voice.mp3
             exit 1
           fi
 
-      - name: Check downloaded audio
+          echo "Audio downloaded successfully."
+          file voice.mp3
+          ls -lh voice.mp3
+
+      - name: Check audio
         run: |
+          echo "=============================="
+          echo "AUDIO DURATION"
+          echo "=============================="
+
           ffprobe \
             -v error \
             -show_entries format=duration \
             -of default=noprint_wrappers=1:nokey=1 \
             voice.mp3
 
-      - name: Create visual video
+      - name: Create AI presenter
         run: |
+          cat > presenter.svg <<'EOF'
+          <svg xmlns="http://www.w3.org/2000/svg" width="700" height="1100" viewBox="0 0 700 1100">
+
+            <defs>
+              <linearGradient id="shirt" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#2563eb"/>
+                <stop offset="100%" stop-color="#7c3aed"/>
+              </linearGradient>
+
+              <radialGradient id="face">
+                <stop offset="0%" stop-color="#ffe0bd"/>
+                <stop offset="100%" stop-color="#e7b98f"/>
+              </radialGradient>
+            </defs>
+
+            <!-- shadow -->
+            <ellipse cx="350" cy="1030" rx="260" ry="35"
+                     fill="#000000" opacity="0.25"/>
+
+            <!-- body -->
+            <path d="M110 1030
+                     C125 820 180 690 350 690
+                     C520 690 575 820 590 1030 Z"
+                  fill="url(#shirt)"/>
+
+            <!-- neck -->
+            <rect x="295" y="610" width="110" height="130"
+                  rx="45" fill="#e7b98f"/>
+
+            <!-- face -->
+            <ellipse cx="350" cy="430" rx="190" ry="230"
+                     fill="url(#face)"/>
+
+            <!-- hair -->
+            <path d="M165 410
+                     C150 190 245 105 355 110
+                     C495 115 555 225 530 405
+                     C485 335 425 300 350 300
+                     C275 300 220 340 165 410 Z"
+                  fill="#182033"/>
+
+            <!-- ears -->
+            <ellipse cx="165" cy="450" rx="30" ry="48"
+                     fill="#e7b98f"/>
+
+            <ellipse cx="535" cy="450" rx="30" ry="48"
+                     fill="#e7b98f"/>
+
+            <!-- eyes -->
+            <ellipse cx="285" cy="435" rx="18" ry="13"
+                     fill="#111827"/>
+
+            <ellipse cx="415" cy="435" rx="18" ry="13"
+                     fill="#111827"/>
+
+            <!-- eyebrows -->
+            <path d="M250 390 Q285 370 315 390"
+                  fill="none"
+                  stroke="#182033"
+                  stroke-width="16"
+                  stroke-linecap="round"/>
+
+            <path d="M385 390 Q415 370 450 390"
+                  fill="none"
+                  stroke="#182033"
+                  stroke-width="16"
+                  stroke-linecap="round"/>
+
+            <!-- nose -->
+            <path d="M350 440 L330 505 Q350 520 370 505"
+                  fill="none"
+                  stroke="#b78362"
+                  stroke-width="10"
+                  stroke-linecap="round"/>
+
+            <!-- smile -->
+            <path d="M290 550 Q350 595 410 550"
+                  fill="none"
+                  stroke="#9f4d50"
+                  stroke-width="12"
+                  stroke-linecap="round"/>
+
+            <!-- collar -->
+            <path d="M295 700 L350 770 L405 700"
+                  fill="#ffffff"
+                  opacity="0.9"/>
+
+            <!-- laptop -->
+            <rect x="165" y="790" width="370" height="210"
+                  rx="18"
+                  fill="#111827"
+                  stroke="#38bdf8"
+                  stroke-width="8"/>
+
+            <rect x="190" y="815" width="320" height="150"
+                  rx="10"
+                  fill="#0f172a"/>
+
+            <!-- laptop AI icon -->
+            <circle cx="350" cy="890" r="48"
+                    fill="none"
+                    stroke="#22d3ee"
+                    stroke-width="9"/>
+
+            <circle cx="330" cy="880" r="7"
+                    fill="#ffffff"/>
+
+            <circle cx="370" cy="880" r="7"
+                    fill="#ffffff"/>
+
+            <path d="M330 910 Q350 925 370 910"
+                  fill="none"
+                  stroke="#ffffff"
+                  stroke-width="7"
+                  stroke-linecap="round"/>
+
+            <!-- laptop base -->
+            <path d="M125 1000 L575 1000 L610 1040 L90 1040 Z"
+                  fill="#374151"/>
+
+          </svg>
+          EOF
+
+          convert -background none presenter.svg presenter.png
+
+          file presenter.png
+          ls -lh presenter.png
+
+      - name: Create vertical YouTube Short
+        run: |
+          DURATION=$(ffprobe \
+            -v error \
+            -show_entries format=duration \
+            -of default=noprint_wrappers=1:nokey=1 \
+            voice.mp3)
+
+          echo "Video duration: $DURATION seconds"
+
           ffmpeg -y \
             -f lavfi \
-            -i "color=c=0x111827:s=1920x1080:r=30" \
+            -i "color=c=0x07111f:s=1080x1920:r=30" \
+            -i presenter.png \
             -i voice.mp3 \
-            -filter_complex "[0:v]drawtext=text='AI TOOLS':fontcolor=white:fontsize=100:x=(w-text_w)/2:y=330,drawtext=text='WORK SMARTER':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=470,drawtext=text='Daily AI Productivity Tip':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=580,drawbox=x=460:y=680:w=1000:h=8:color=white@0.25:t=fill,drawbox=x=460:y=680:w='min(1000,t*100)':h=8:color=white:t=fill[v]" \
+            -filter_complex "
+
+              [0:v]
+              drawbox=x=0:y=0:w=1080:h=1920:
+              color=0x07111f:t=fill,
+
+              drawbox=x=35:y=35:w=1010:h=1850:
+              color=0x0f2a44@0.8:t=fill,
+
+              drawbox=x=65:y=65:w=950:h=1790:
+              color=0x07111f@0.9:t=fill,
+
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='AI TOOLS DAILY':
+              fontcolor=white:
+              fontsize=58:
+              x=(w-text_w)/2:
+              y=105,
+
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='WORK SMARTER WITH AI':
+              fontcolor=0x38bdf8:
+              fontsize=38:
+              x=(w-text_w)/2:
+              y=185,
+
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='SAVE TIME':
+              fontcolor=white:
+              fontsize=74:
+              x=(w-text_w)/2:
+              y=310:
+              enable='between(t,0,4)',
+
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='AI AUTOMATION':
+              fontcolor=white:
+              fontsize=68:
+              x=(w-text_w)/2:
+              y=310:
+              enable='between(t,4,8)',
+
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='WORK SMARTER':
+              fontcolor=white:
+              fontsize=72:
+              x=(w-text_w)/2:
+              y=310:
+              enable='gte(t,8)',
+
+              drawbox=
+              x=95:y=415:w=890:h=4:
+              color=0x38bdf8@0.7:t=fill,
+
+              [1:v]
+              scale=570:895:
+              [presenter];
+
+              [0:v][presenter]
+              overlay=
+              x=(W-w)/2:
+              y=520:
+              [v]
+
+            " \
             -map "[v]" \
-            -map 1:a \
+            -map 2:a \
             -c:v libx264 \
             -preset veryfast \
+            -pix_fmt yuv420p \
             -c:a aac \
-            -b:a 192k \
+            -b:a 128k \
             -shortest \
+            -movflags +faststart \
             video.mp4
 
-      - name: Check final video
+      - name: Check final Short
         run: |
+          echo "=============================="
+          echo "FINAL VIDEO"
+          echo "=============================="
+
           ffprobe \
             -v error \
             -show_entries format=duration \
@@ -87,7 +310,7 @@ jobs:
 
           ls -lh video.mp4
 
-      - name: Upload video to YouTube
+      - name: Upload Short to YouTube
         run: |
           HTTP_CODE=$(curl -sS -X POST \
             -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
@@ -98,15 +321,20 @@ jobs:
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload")
 
           echo "Worker HTTP status: $HTTP_CODE"
-          echo "Worker response:"
+
+          echo "=============================="
+          echo "YOUTUBE RESPONSE"
+          echo "=============================="
+
           cat upload-response.txt
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "YouTube upload failed."
             exit 1
           fi
-      - name: Save video
+
+      - name: Save Short
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-video
+          name: youtube-short
           path: video.mp4
