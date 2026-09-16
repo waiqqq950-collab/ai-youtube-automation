@@ -200,7 +200,7 @@ jobs:
           ls -lh presenter.png
 
            - name: Create vertical YouTube Short
-        run: |
+      run: |
           ffmpeg -y \
             -f lavfi \
             -i "color=c=0x07111f:s=1080x1920:r=30" \
