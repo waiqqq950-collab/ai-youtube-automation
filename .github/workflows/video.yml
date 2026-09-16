@@ -12,11 +12,17 @@ jobs:
 
     steps:
 
+      # --------------------------------
+      # 1. INSTALL TOOLS
+      # --------------------------------
       - name: Install ffmpeg and image tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick fonts-dejavu
 
+      # --------------------------------
+      # 2. GET AI SCRIPT
+      # --------------------------------
       - name: Get daily AI script
         run: |
           curl -fL \
@@ -26,14 +32,19 @@ jobs:
           echo "=============================="
           echo "AI SCRIPT"
           echo "=============================="
+
           cat script.txt
 
           echo ""
           echo "=============================="
           echo "WORD COUNT"
           echo "=============================="
+
           wc -w script.txt
 
+      # --------------------------------
+      # 3. CREATE AI VOICE
+      # --------------------------------
       - name: Download AI voice
         run: |
           HTTP_CODE=$(curl -sS -X POST \
@@ -49,14 +60,20 @@ jobs:
             echo "=============================="
             echo "AI AUDIO ERROR"
             echo "=============================="
+
             cat voice.mp3
+
             exit 1
           fi
 
           echo "Audio downloaded successfully."
+
           file voice.mp3
           ls -lh voice.mp3
 
+      # --------------------------------
+      # 4. CHECK AUDIO
+      # --------------------------------
       - name: Check audio
         run: |
           echo "=============================="
@@ -69,138 +86,229 @@ jobs:
             -of default=noprint_wrappers=1:nokey=1 \
             voice.mp3
 
+      # --------------------------------
+      # 5. CREATE AI PRESENTER IMAGE
+      # --------------------------------
       - name: Create AI presenter
         run: |
           cat > presenter.svg <<'EOF'
-          <svg xmlns="http://www.w3.org/2000/svg" width="700" height="1100" viewBox="0 0 700 1100">
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="700"
+               height="1100"
+               viewBox="0 0 700 1100">
 
             <defs>
-              <linearGradient id="shirt" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#2563eb"/>
-                <stop offset="100%" stop-color="#7c3aed"/>
+
+              <linearGradient id="shirt"
+                              x1="0"
+                              y1="0"
+                              x2="1"
+                              y2="1">
+
+                <stop offset="0%"
+                      stop-color="#2563eb"/>
+
+                <stop offset="100%"
+                      stop-color="#7c3aed"/>
+
               </linearGradient>
 
               <radialGradient id="face">
-                <stop offset="0%" stop-color="#ffe0bd"/>
-                <stop offset="100%" stop-color="#e7b98f"/>
+
+                <stop offset="0%"
+                      stop-color="#ffe0bd"/>
+
+                <stop offset="100%"
+                      stop-color="#e7b98f"/>
+
               </radialGradient>
+
             </defs>
 
             <!-- shadow -->
-            <ellipse cx="350" cy="1030" rx="260" ry="35"
-                     fill="#000000" opacity="0.25"/>
+            <ellipse
+              cx="350"
+              cy="1030"
+              rx="260"
+              ry="35"
+              fill="#000000"
+              opacity="0.25"/>
 
             <!-- body -->
-            <path d="M110 1030
-                     C125 820 180 690 350 690
-                     C520 690 575 820 590 1030 Z"
-                  fill="url(#shirt)"/>
+            <path
+              d="M110 1030
+                 C125 820 180 690 350 690
+                 C520 690 575 820 590 1030 Z"
+              fill="url(#shirt)"/>
 
             <!-- neck -->
-            <rect x="295" y="610" width="110" height="130"
-                  rx="45" fill="#e7b98f"/>
+            <rect
+              x="295"
+              y="610"
+              width="110"
+              height="130"
+              rx="45"
+              fill="#e7b98f"/>
 
             <!-- face -->
-            <ellipse cx="350" cy="430" rx="190" ry="230"
-                     fill="url(#face)"/>
+            <ellipse
+              cx="350"
+              cy="430"
+              rx="190"
+              ry="230"
+              fill="url(#face)"/>
 
             <!-- hair -->
-            <path d="M165 410
-                     C150 190 245 105 355 110
-                     C495 115 555 225 530 405
-                     C485 335 425 300 350 300
-                     C275 300 220 340 165 410 Z"
-                  fill="#182033"/>
+            <path
+              d="M165 410
+                 C150 190 245 105 355 110
+                 C495 115 555 225 530 405
+                 C485 335 425 300 350 300
+                 C275 300 220 340 165 410 Z"
+              fill="#182033"/>
 
             <!-- ears -->
-            <ellipse cx="165" cy="450" rx="30" ry="48"
-                     fill="#e7b98f"/>
+            <ellipse
+              cx="165"
+              cy="450"
+              rx="30"
+              ry="48"
+              fill="#e7b98f"/>
 
-            <ellipse cx="535" cy="450" rx="30" ry="48"
-                     fill="#e7b98f"/>
+            <ellipse
+              cx="535"
+              cy="450"
+              rx="30"
+              ry="48"
+              fill="#e7b98f"/>
 
             <!-- eyes -->
-            <ellipse cx="285" cy="435" rx="18" ry="13"
-                     fill="#111827"/>
+            <ellipse
+              cx="285"
+              cy="435"
+              rx="18"
+              ry="13"
+              fill="#111827"/>
 
-            <ellipse cx="415" cy="435" rx="18" ry="13"
-                     fill="#111827"/>
+            <ellipse
+              cx="415"
+              cy="435"
+              rx="18"
+              ry="13"
+              fill="#111827"/>
 
             <!-- eyebrows -->
-            <path d="M250 390 Q285 370 315 390"
-                  fill="none"
-                  stroke="#182033"
-                  stroke-width="16"
-                  stroke-linecap="round"/>
+            <path
+              d="M250 390 Q285 370 315 390"
+              fill="none"
+              stroke="#182033"
+              stroke-width="16"
+              stroke-linecap="round"/>
 
-            <path d="M385 390 Q415 370 450 390"
-                  fill="none"
-                  stroke="#182033"
-                  stroke-width="16"
-                  stroke-linecap="round"/>
+            <path
+              d="M385 390 Q415 370 450 390"
+              fill="none"
+              stroke="#182033"
+              stroke-width="16"
+              stroke-linecap="round"/>
 
             <!-- nose -->
-            <path d="M350 440 L330 505 Q350 520 370 505"
-                  fill="none"
-                  stroke="#b78362"
-                  stroke-width="10"
-                  stroke-linecap="round"/>
+            <path
+              d="M350 440 L330 505 Q350 520 370 505"
+              fill="none"
+              stroke="#b78362"
+              stroke-width="10"
+              stroke-linecap="round"/>
 
             <!-- smile -->
-            <path d="M290 550 Q350 595 410 550"
-                  fill="none"
-                  stroke="#9f4d50"
-                  stroke-width="12"
-                  stroke-linecap="round"/>
+            <path
+              d="M290 550 Q350 595 410 550"
+              fill="none"
+              stroke="#9f4d50"
+              stroke-width="12"
+              stroke-linecap="round"/>
 
             <!-- collar -->
-            <path d="M295 700 L350 770 L405 700"
-                  fill="#ffffff"
-                  opacity="0.9"/>
+            <path
+              d="M295 700 L350 770 L405 700"
+              fill="#ffffff"
+              opacity="0.9"/>
 
             <!-- laptop -->
-            <rect x="165" y="790" width="370" height="210"
-                  rx="18"
-                  fill="#111827"
-                  stroke="#38bdf8"
-                  stroke-width="8"/>
+            <rect
+              x="165"
+              y="790"
+              width="370"
+              height="210"
+              rx="18"
+              fill="#111827"
+              stroke="#38bdf8"
+              stroke-width="8"/>
 
-            <rect x="190" y="815" width="320" height="150"
-                  rx="10"
-                  fill="#0f172a"/>
+            <rect
+              x="190"
+              y="815"
+              width="320"
+              height="150"
+              rx="10"
+              fill="#0f172a"/>
 
-            <!-- laptop AI icon -->
-            <circle cx="350" cy="890" r="48"
-                    fill="none"
-                    stroke="#22d3ee"
-                    stroke-width="9"/>
+            <!-- AI icon -->
+            <circle
+              cx="350"
+              cy="890"
+              r="48"
+              fill="none"
+              stroke="#22d3ee"
+              stroke-width="9"/>
 
-            <circle cx="330" cy="880" r="7"
-                    fill="#ffffff"/>
+            <circle
+              cx="330"
+              cy="880"
+              r="7"
+              fill="#ffffff"/>
 
-            <circle cx="370" cy="880" r="7"
-                    fill="#ffffff"/>
+            <circle
+              cx="370"
+              cy="880"
+              r="7"
+              fill="#ffffff"/>
 
-            <path d="M330 910 Q350 925 370 910"
-                  fill="none"
-                  stroke="#ffffff"
-                  stroke-width="7"
-                  stroke-linecap="round"/>
+            <path
+              d="M330 910 Q350 925 370 910"
+              fill="none"
+              stroke="#ffffff"
+              stroke-width="7"
+              stroke-linecap="round"/>
 
             <!-- laptop base -->
-            <path d="M125 1000 L575 1000 L610 1040 L90 1040 Z"
-                  fill="#374151"/>
+            <path
+              d="M125 1000
+                 L575 1000
+                 L610 1040
+                 L90 1040 Z"
+              fill="#374151"/>
 
           </svg>
           EOF
 
-          convert -background none presenter.svg presenter.png
+          convert \
+            -background none \
+            presenter.svg \
+            presenter.png
+
+          echo "Presenter created."
 
           file presenter.png
           ls -lh presenter.png
 
-           - name: Create vertical YouTube Short
-      run: |
+      # --------------------------------
+      # 6. CREATE VERTICAL SHORT
+      # --------------------------------
+      - name: Create vertical YouTube Short
+        run: |
+          echo "Creating vertical 9:16 video..."
+
           ffmpeg -y \
             -f lavfi \
             -i "color=c=0x07111f:s=1080x1920:r=30" \
@@ -208,8 +316,54 @@ jobs:
             -i presenter.png \
             -i voice.mp3 \
             -filter_complex "
-              [1:v]scale=650:1020[presenter];
-              [0:v][presenter]overlay=215:500[v]
+              [1:v]scale=620:974[presenter];
+
+              [0:v]
+              drawbox=x=35:y=35:w=1010:h=1850:
+              color=0x0f2a44@0.8:t=fill,
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='AI TOOLS DAILY':
+              fontcolor=white:
+              fontsize=58:
+              x=(w-text_w)/2:
+              y=100,
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='WORK SMARTER WITH AI':
+              fontcolor=0x38bdf8:
+              fontsize=38:
+              x=(w-text_w)/2:
+              y=180,
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='SAVE TIME':
+              fontcolor=white:
+              fontsize=72:
+              x=(w-text_w)/2:
+              y=300:
+              enable='between(t,0,4)',
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='AI AUTOMATION':
+              fontcolor=white:
+              fontsize=64:
+              x=(w-text_w)/2:
+              y=300:
+              enable='between(t,4,8)',
+              drawtext=
+              fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:
+              text='WORK SMARTER':
+              fontcolor=white:
+              fontsize=68:
+              x=(w-text_w)/2:
+              y=300:
+              enable='gte(t,8)'
+              [bg];
+
+              [bg][presenter]
+              overlay=x=230:y=520
+              [v]
             " \
             -map "[v]" \
             -map 2:a \
@@ -222,6 +376,11 @@ jobs:
             -movflags +faststart \
             video.mp4
 
+          echo "Video created successfully."
+
+      # --------------------------------
+      # 7. CHECK FINAL VIDEO
+      # --------------------------------
       - name: Check final Short
         run: |
           echo "=============================="
@@ -235,8 +394,14 @@ jobs:
             -of default=noprint_wrappers=1 \
             video.mp4
 
+          echo ""
+          echo "Video file:"
+
           ls -lh video.mp4
 
+      # --------------------------------
+      # 8. UPLOAD TO YOUTUBE
+      # --------------------------------
       - name: Upload Short to YouTube
         run: |
           HTTP_CODE=$(curl -sS -X POST \
@@ -260,6 +425,9 @@ jobs:
             exit 1
           fi
 
+      # --------------------------------
+      # 9. SAVE VIDEO ARTIFACT
+      # --------------------------------
       - name: Save Short
         uses: actions/upload-artifact@v4
         with:
