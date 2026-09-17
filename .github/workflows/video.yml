@@ -1,4 +1,4 @@
-name: AI Tools Daily - Professional Shorts
+name: AI Tools Daily - Cinematic Human Presenter V3
 
 on:
   workflow_dispatch:
@@ -9,119 +9,140 @@ permissions:
   contents: read
 
 concurrency:
-  group: ai-tools-daily
+  group: ai-tools-daily-video
   cancel-in-progress: false
 
 jobs:
   create-video:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
-
-      - name: Install tools
+      - name: Install video tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg python3-pil fonts-dejavu
-
           ffmpeg -version | head -n 1
           python3 --version
 
-      # =====================================================
-      # AI SCRIPT
-      # =====================================================
-
-      - name: Get AI script
+      - name: Get AI content package
         run: |
-          set -e
-
           curl -fsSL \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-script" \
-            -o script.txt
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-content" \
+            -o content.json
 
-          test -s script.txt
+          python3 - <<'PY'
+          import json, sys
+          with open("content.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
 
-          echo "===== AI SCRIPT ====="
-          cat script.txt
+          if "error" in data:
+              print("WORKER ERROR:")
+              print(data["error"])
+              sys.exit(1)
 
-      # =====================================================
-      # AI TITLE
-      # =====================================================
+          required = ["title", "script", "hook", "tool", "benefit", "example", "tip", "description", "tags"]
+          missing = [x for x in required if not data.get(x)]
+          if missing:
+              print("Missing fields:", missing)
+              sys.exit(1)
 
-      - name: Get AI title
+          # If the AI does not return visual prompts, the next step will create
+          # topic-specific fallback prompts automatically.
+          if not isinstance(data.get("visual_prompts"), list):
+              data["visual_prompts"] = []
+
+          with open("script.txt", "w", encoding="utf-8") as f:
+              f.write(data["script"].strip())
+          with open("title.txt", "w", encoding="utf-8") as f:
+              f.write(data["title"].strip())
+          with open("description.txt", "w", encoding="utf-8") as f:
+              f.write(data["description"].strip())
+          with open("tags.txt", "w", encoding="utf-8") as f:
+              f.write(",".join(str(x).strip() for x in data["tags"] if str(x).strip()))
+
+          print("===== TITLE =====")
+          print(data["title"])
+          print("===== SCRIPT =====")
+          print(data["script"])
+          print("===== TOOL =====")
+          print(data["tool"])
+          print("===== HOOK =====")
+          print(data["hook"])
+          PY
+
+      - name: Generate AI presenter and topic visuals
         run: |
-          set -e
+          python3 - <<'PY'
+          import json, urllib.request, urllib.error, os
 
-          curl -fsSL \
-            -X POST \
-            -H "Content-Type: text/plain; charset=utf-8" \
-            --data-binary "@script.txt" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-title" \
-            -o title.txt
+          BASE = "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image"
 
-          test -s title.txt
+          with open("content.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
 
-          echo "===== AI TITLE ====="
-          cat title.txt
+          def generate(filename, prompt, seed):
+              payload = json.dumps({"prompt": prompt, "seed": seed}).encode("utf-8")
+              req = urllib.request.Request(
+                  BASE,
+                  data=payload,
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as r:
+                      body = r.read()
+                      if r.status != 200:
+                          raise RuntimeError(f"HTTP {r.status}: {body[:500]!r}")
+              except urllib.error.HTTPError as e:
+                  detail = e.read().decode("utf-8", "replace")
+                  raise RuntimeError(f"Image generation failed for {filename}: HTTP {e.code}: {detail}")
+              with open(filename, "wb") as f:
+                  f.write(body)
+              if os.path.getsize(filename) < 1000:
+                  raise RuntimeError(f"{filename} is unexpectedly small")
+              print("Created", filename, os.path.getsize(filename), "bytes")
 
-      # =====================================================
-      # AI DESCRIPTION
-      # =====================================================
+          presenter_prompt = (
+              "A realistic cinematic vertical 9:16 portrait of a friendly young professional male technology presenter, "
+              "waist-up, confident natural hand gesture as if explaining an AI productivity tip to viewers, "
+              "clean modern dark tech studio, subtle blue and cyan lighting, realistic skin, natural face, "
+              "smart casual black shirt, no text, no logos, no watermark, centered composition, high detail"
+          )
+          generate("presenter.jpg", presenter_prompt, 424242)
 
-      - name: Get AI description
-        run: |
-          set -e
+          prompts = data.get("visual_prompts", [])
+          if len(prompts) < 3:
+              tool = data.get("tool", "AI productivity")
+              prompts = [
+                  f"Realistic cinematic vertical 9:16 scene about the problem solved by {tool}, modern office, person working at a laptop, no text, no logos",
+                  f"Realistic cinematic vertical 9:16 scene showing {tool} being used in a modern AI workflow, laptop and smartphone, no readable text, no logos",
+                  f"Realistic cinematic vertical 9:16 scene showing a productive successful result after using {tool}, modern workspace, no text, no logos",
+              ]
 
-          curl -fsSL \
-            -X POST \
-            -H "Content-Type: text/plain; charset=utf-8" \
-            --data-binary "@script.txt" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-description" \
-            -o description.txt
+          for i, prompt in enumerate(prompts[:3], 1):
+              prompt = (
+                  "Create a realistic cinematic B-roll image for a YouTube Short. "
+                  "Vertical 9:16. No readable text, no captions, no logos, no watermark. "
+                  + prompt
+              )
+              generate(f"visual{i}.jpg", prompt, 1000 + i)
 
-          test -s description.txt
+          PY
 
-          echo "===== DESCRIPTION ====="
-          cat description.txt
-
-      # =====================================================
-      # AI TAGS
-      # =====================================================
-
-      - name: Get AI tags
-        run: |
-          set -e
-
-          curl -fsSL \
-            -X POST \
-            -H "Content-Type: text/plain; charset=utf-8" \
-            --data-binary "@script.txt" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-tags" \
-            -o tags.txt
-
-          test -s tags.txt
-
-          echo "===== TAGS ====="
-          cat tags.txt
-
-      # =====================================================
-      # AI VOICE
-      # =====================================================
+          file presenter.jpg visual1.jpg visual2.jpg visual3.jpg
 
       - name: Create AI voice
         run: |
-          set -e
-
           HTTP_CODE=$(curl -sS \
             -X POST \
-            -H "Content-Type: text/plain; charset=utf-8" \
+            -H "Content-Type: text/plain" \
             --data-binary "@script.txt" \
             -o voice.mp3 \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio")
 
           echo "Audio HTTP code: $HTTP_CODE"
-
           if [ "$HTTP_CODE" != "200" ]; then
             echo "===== AUDIO ERROR ====="
             cat voice.mp3 || true
@@ -129,425 +150,284 @@ jobs:
           fi
 
           test -s voice.mp3
-
           file voice.mp3
-
-      # =====================================================
-      # AUDIO DURATION
-      # =====================================================
 
       - name: Measure voice
         run: |
-          set -e
-
-          DURATION=$(ffprobe \
-            -v error \
-            -show_entries format=duration \
-            -of default=noprint_wrappers=1:nokey=1 \
-            voice.mp3)
-
+          DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 voice.mp3)
           echo "Audio duration: $DURATION seconds"
-
-          python3 - "$DURATION" <<'PY'
-          import sys
-
-          duration = float(sys.argv[1])
-
-          if duration < 5:
-              raise SystemExit("ERROR: Audio is too short.")
-
-          if duration > 70:
-              raise SystemExit("ERROR: Audio is too long.")
+          python3 - <<PY
+          d = float("$DURATION")
+          if d < 12 or d > 70:
+              raise SystemExit(f"Unexpected audio duration: {d:.2f}s")
           PY
+          echo "$DURATION" > duration.txt
 
-          printf '%s' "$DURATION" > duration.txt
-
-      # =====================================================
-      # CREATE SCENES + CAPTIONS
-      # =====================================================
-
-      - name: Build scenes and captions
+      - name: Build cinematic presenter scenes and captions
         run: |
-          set -e
+          cat > make_assets.py <<'PY'
+          import json, os, re, math
+          from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
-          python3 <<'PY'
-          from PIL import Image, ImageDraw, ImageFont
-          import math
-          import re
-          import os
+          W, H = 1080, 1920
+          with open("content.json", "r", encoding="utf-8") as f:
+              c = json.load(f)
+          duration = float(open("duration.txt", "r", encoding="utf-8").read().strip())
 
-          W = 1080
-          H = 1920
+          FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+          FONT_REG = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 
-          def get_font(size, bold=False):
-              if bold:
-                  path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-              else:
-                  path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+          def font(size, bold=True):
+              return ImageFont.truetype(FONT_BOLD if bold else FONT_REG, size)
 
-              return ImageFont.truetype(path, size)
+          def wrap(text, fnt, max_width):
+              words = str(text or "").split()
+              lines, line = [], ""
+              probe = Image.new("RGB", (10,10))
+              d = ImageDraw.Draw(probe)
+              for word in words:
+                  test = (line + " " + word).strip()
+                  if d.textbbox((0,0), test, font=fnt)[2] <= max_width:
+                      line = test
+                  else:
+                      if line:
+                          lines.append(line)
+                      line = word
+              if line:
+                  lines.append(line)
+              return lines
 
-          big_font = get_font(62, True)
-          small_font = get_font(30, False)
+          def rounded(img, radius=50):
+              mask = Image.new("L", img.size, 0)
+              d = ImageDraw.Draw(mask)
+              d.rounded_rectangle((0,0,img.width,img.height), radius=radius, fill=255)
+              out = Image.new("RGBA", img.size, (0,0,0,0))
+              out.paste(img.convert("RGBA"), (0,0), mask)
+              return out
 
-          with open("script.txt", encoding="utf-8") as f:
-              script = f.read().strip()
+          def fit_crop(img, size):
+              img = img.convert("RGB")
+              sw, sh = img.size
+              tw, th = size
+              scale = max(tw/sw, th/sh)
+              img = img.resize((int(sw*scale), int(sh*scale)), Image.Resampling.LANCZOS)
+              x = (img.width-tw)//2
+              y = (img.height-th)//2
+              return img.crop((x,y,x+tw,y+th))
 
-          with open("title.txt", encoding="utf-8") as f:
-              title = f.read().strip()
+          presenter = fit_crop(Image.open("presenter.jpg"), (420, 560))
+          visual1 = fit_crop(Image.open("visual1.jpg"), (W,H))
+          visual2 = fit_crop(Image.open("visual2.jpg"), (W,H))
+          visual3 = fit_crop(Image.open("visual3.jpg"), (W,H))
 
-          words = re.findall(r"\S+", script)
+          # Consistent dark overlay makes captions readable while preserving the AI B-roll.
+          def make_bg(img, strength=95):
+              img = ImageEnhance.Contrast(img).enhance(1.08)
+              overlay = Image.new("RGBA", (W,H), (3,8,18,strength))
+              return Image.alpha_composite(img.convert("RGBA"), overlay)
 
-          labels = [
-              "THE HOOK",
-              "THE AI TOOL",
-              "HOW IT WORKS",
-              "TRY THIS",
-              "THE BENEFIT",
-              "QUICK TAKEAWAY"
+          def add_glow(img):
+              glow = Image.new("RGBA",(W,H),(0,0,0,0))
+              d = ImageDraw.Draw(glow)
+              for x,y,r,a in [(90,360,260,35),(950,900,300,28),(160,1600,240,25)]:
+                  d.ellipse((x-r,y-r,x+r,y+r), fill=(45,190,255,a))
+              glow = glow.filter(ImageFilter.GaussianBlur(55))
+              return Image.alpha_composite(img, glow)
+
+          def add_grid(img):
+              layer = Image.new("RGBA",(W,H),(0,0,0,0))
+              d = ImageDraw.Draw(layer)
+              for y in range(0,H,180):
+                  d.line((0,y,W,y), fill=(255,255,255,12), width=1)
+              for x in range(0,W,180):
+                  d.line((x,0,x,H), fill=(255,255,255,9), width=1)
+              return Image.alpha_composite(img, layer)
+
+          def presenter_card(base, x, y, scale=1.0):
+              pw, ph = int(420*scale), int(560*scale)
+              p = presenter.resize((pw,ph), Image.Resampling.LANCZOS)
+              p = rounded(p, 42)
+              shadow = Image.new("RGBA",(pw+30,ph+30),(0,0,0,0))
+              sd = ImageDraw.Draw(shadow)
+              sd.rounded_rectangle((15,15,pw+15,ph+15), radius=45, fill=(0,0,0,150))
+              shadow = shadow.filter(ImageFilter.GaussianBlur(14))
+              base.alpha_composite(shadow,(x-15,y-5))
+              base.alpha_composite(p,(x,y))
+              d=ImageDraw.Draw(base)
+              d.rounded_rectangle((x,y,x+pw,y+ph), radius=42, outline=(70,210,255,210), width=4)
+              return base
+
+          def label(base, text, y, accent=(70,220,255), size=62):
+              d=ImageDraw.Draw(base)
+              box=(55,y,1025,y+125)
+              d.rounded_rectangle(box, radius=30, fill=(2,8,18,205), outline=accent, width=3)
+              lines=wrap(text,font(size),860)
+              yy=y+18
+              for line in lines[:2]:
+                  bb=d.textbbox((0,0),line,font=font(size))
+                  x=(W-(bb[2]-bb[0]))//2
+                  d.text((x,yy),line,font=font(size),fill=(255,255,255))
+                  yy += size+8
+
+          scenes = [
+              ("hook", visual1, c.get("hook","This AI trick saves serious time"), (55,300), (70,220,255)),
+              ("tool", visual2, c.get("tool","A useful AI tool"), (570,1040), (170,120,255)),
+              ("example", visual2, c.get("example","Here is how to use it"), (70,1050), (255,205,70)),
+              ("benefit", visual3, c.get("benefit","A practical result"), (570,1040), (60,240,190)),
+              ("tip", visual3, c.get("tip","Use a clear, specific prompt"), (70,1040), (255,100,160)),
+              ("cta", visual3, c.get("cta","Subscribe for more AI tips."), (570,1050), (80,220,255)),
           ]
 
-          chunks = []
-
-          for i in range(6):
-              start = round(i * len(words) / 6)
-              end = round((i + 1) * len(words) / 6)
-              chunks.append(" ".join(words[start:end]))
-
-          for i in range(6):
-
-              image = Image.new(
-                  "RGB",
-                  (W, H),
-                  (7, 14, 28)
-              )
-
-              draw = ImageDraw.Draw(image)
-
-              draw.rounded_rectangle(
-                  (55, 55, W - 55, H - 55),
-                  radius=55,
-                  fill=(13, 27, 49),
-                  outline=(55, 87, 130),
-                  width=4
-              )
-
-              draw.rounded_rectangle(
-                  (85, 110, W - 85, 205),
-                  radius=28,
-                  fill=(20, 45, 76)
-              )
-
-              draw.text(
-                  (120, 137),
-                  labels[i],
-                  font=small_font,
-                  fill=(190, 220, 255)
-              )
-
-              # Progress dots
-
-              for j in range(6):
-
-                  x = 120 + j * 45
-
-                  radius = 15 if j == i else 10
-
-                  draw.ellipse(
-                      (
-                          x - radius,
-                          260 - radius,
-                          x + radius,
-                          260 + radius
-                      ),
-                      fill=(
-                          (120, 190, 255)
-                          if j == i
-                          else (55, 78, 105)
-                      )
-                  )
-
-              text = chunks[i].strip()
-
-              if not text:
-                  text = "One useful AI idea you can use today."
-
-              # Wrap text
-
-              lines = []
-
-              current = ""
-
-              for word in text.split():
-
-                  test = (
-                      current + " " + word
-                  ).strip()
-
-                  width = draw.textbbox(
-                      (0, 0),
-                      test,
-                      font=big_font
-                  )[2]
-
-                  if width > 850:
-
-                      if current:
-                          lines.append(current)
-
-                      current = word
-
-                  else:
-                      current = test
-
-              if current:
-                  lines.append(current)
-
-              y = 470
-
-              for line in lines[:8]:
-
-                  draw.text(
-                      (120, y),
-                      line,
-                      font=big_font,
-                      fill=(245, 248, 255)
-                  )
-
-                  y += 90
-
-              # Branding
-
-              draw.text(
-                  (120, 1700),
-                  "AI TOOLS DAILY",
-                  font=small_font,
-                  fill=(150, 180, 215)
-              )
-
-              draw.text(
-                  (120, 1760),
-                  title[:48],
-                  font=small_font,
-                  fill=(105, 160, 220)
-              )
-
-              image.save(
-                  f"scene{i + 1}.png"
-              )
-
-          # =================================================
-          # CAPTIONS
-          # =================================================
-
-          duration = float(
-              open("duration.txt").read().strip()
-          )
-
-          caption_groups = []
-
-          for i in range(0, len(words), 5):
-              caption_groups.append(
-                  " ".join(words[i:i + 5])
-              )
-
-          def ass_time(seconds):
-
-              hours = int(seconds // 3600)
-
-              seconds -= hours * 3600
-
-              minutes = int(seconds // 60)
-
-              seconds -= minutes * 60
-
-              whole = int(seconds)
-
-              centiseconds = int(
-                  round(
-                      (seconds - whole) * 100
-                  )
-              )
-
-              if centiseconds >= 100:
-                  whole += 1
-                  centiseconds = 0
-
-              return (
-                  f"{hours}:"
-                  f"{minutes:02d}:"
-                  f"{whole:02d}."
-                  f"{centiseconds:02d}"
-              )
-
-          with open(
-              "captions.ass",
-              "w",
-              encoding="utf-8"
-          ) as f:
-
-              f.write(
-                  "[Script Info]\n"
-              )
-
-              f.write(
-                  "ScriptType: v4.00+\n"
-              )
-
-              f.write(
-                  "PlayResX: 1080\n"
-              )
-
-              f.write(
-                  "PlayResY: 1920\n\n"
-              )
-
-              f.write(
-                  "[V4+ Styles]\n"
-              )
-
-              f.write(
-                  "Format: Name, Fontname, Fontsize, "
-                  "PrimaryColour, SecondaryColour, "
-                  "OutlineColour, BackColour, Bold, "
-                  "Italic, Underline, StrikeOut, "
-                  "ScaleX, ScaleY, Spacing, Angle, "
-                  "BorderStyle, Outline, Shadow, "
-                  "Alignment, MarginL, MarginR, "
-                  "MarginV, Encoding\n"
-              )
-
-              f.write(
-                  "Style: Default,DejaVu Sans,54,"
-                  "&H00FFFFFF,&H00FFFFFF,"
-                  "&H0010182B,&H8010182B,"
-                  "-1,0,0,0,100,100,0,0,1,5,2,"
-                  "2,80,80,250,1\n\n"
-              )
-
-              f.write(
-                  "[Events]\n"
-              )
-
-              f.write(
-                  "Format: Layer, Start, End, Style, "
-                  "Name, MarginL, MarginR, MarginV, "
-                  "Effect, Text\n"
-              )
-
-              step = (
-                  duration /
-                  max(1, len(caption_groups))
-              )
-
-              for i, text in enumerate(
-                  caption_groups
-              ):
-
-                  start = i * step
-
-                  end = min(
-                      duration,
-                      (i + 1) * step
-                  )
-
-                  text = (
-                      text
-                      .replace("{", "(")
-                      .replace("}", ")")
-                  )
-
-                  f.write(
-                      "Dialogue: 0,"
-                      + ass_time(start)
-                      + ","
-                      + ass_time(end)
-                      + ",Default,,0,0,0,,"
-                      + text
-                      + "\n"
-                  )
-
-          print("Scenes and captions created.")
-
+          for idx,(kind,bg,text,(px,py),accent) in enumerate(scenes,1):
+              img=make_bg(bg,105)
+              img=add_glow(img)
+              img=add_grid(img)
+              d=ImageDraw.Draw(img)
+
+              # top brand pill
+              d.rounded_rectangle((45,45,520,125),radius=28,fill=(0,0,0,170),outline=(80,210,255,160),width=2)
+              d.text((75,65),"AI TOOLS DAILY",font=font(34),fill=(240,248,255))
+              d.text((960,67),f"{idx}/6",font=font(32),fill=(150,220,255))
+
+              # cinematic dark band behind the main message
+              d.rounded_rectangle((45,180,1035,900),radius=45,fill=(0,0,0,110),outline=(255,255,255,35),width=2)
+
+              if kind=="hook":
+                  d.text((80,245),"YOU SHOULD KNOW THIS",font=font(40),fill=accent)
+                  lines=wrap(text,font(82),900)
+                  yy=340
+                  for line in lines[:3]:
+                      bb=d.textbbox((0,0),line,font=font(82))
+                      d.text(((W-(bb[2]-bb[0]))//2,yy),line,font=font(82),fill=(255,255,255))
+                      yy+=105
+              elif kind=="tool":
+                  d.text((80,245),"THE TOOL",font=font(40),fill=accent)
+                  lines=wrap(text,font(74),900)
+                  yy=350
+                  for line in lines[:3]:
+                      bb=d.textbbox((0,0),line,font=font(74))
+                      d.text(((W-(bb[2]-bb[0]))//2,yy),line,font=font(74),fill=(255,255,255))
+                      yy+=95
+              else:
+                  d.text((80,245),kind.upper(),font=font(40),fill=accent)
+                  label(img,text,350,accent,58)
+
+              presenter_card(img,px,py,0.82)
+              d=ImageDraw.Draw(img)
+              d.rounded_rectangle((55,1660,1025,1830),radius=35,fill=(0,0,0,175))
+              d.text((85,1700),"AI Tools Daily",font=font(42),fill=(225,240,255))
+              d.text((W-320,1700),"WORK SMARTER",font=font(34),fill=accent)
+
+              img.convert("RGB").save(f"scene{idx}.png",quality=94)
+
+          # Word-synced captions, 5 words at a time.
+          words=re.findall(r"\\S+",c["script"])
+          chunks=[words[i:i+5] for i in range(0,len(words),5)]
+          total=len(words)
+          ass=[
+              "[Script Info]","ScriptType: v4.00+","PlayResX: 1080","PlayResY: 1920",
+              "ScaledBorderAndShadow: yes","",
+              "[V4+ Styles]",
+              "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+              "Style: Main,DejaVu Sans,58,&H00FFFFFF,&H00FFFFFF,&H00101828,&H90101828,1,0,0,0,100,100,0,0,1,5,2,2,70,70,280,1",
+              "",
+              "[Events]",
+              "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
+          ]
+          t=0.0
+          for chunk in chunks:
+              dur=duration*len(chunk)/max(1,total)
+              start=t; end=min(duration,t+dur)
+              def ts(x):
+                  h=int(x//3600); m=int((x%3600)//60); s=x%60
+                  return f"{h}:{m:02d}:{s:05.2f}"
+              text=" ".join(chunk).replace("{","\\{").replace("}","\\}")
+              parts=text.rsplit(" ",1)
+              if len(parts)==2:
+                  text=parts[0]+" {\\c&H0030FFFF&}"+parts[1]+"{\\c&H00FFFFFF&}"
+              ass.append(f"Dialogue: 0,{ts(start)},{ts(end)},Main,,0,0,280,,{text}")
+              t=end
+          with open("captions.ass","w",encoding="utf-8") as f:
+              f.write("\n".join(ass)+"\n")
           PY
 
-          ls -lh scene*.png
-          ls -lh captions.ass
+          python3 make_assets.py
+          ls -lh presenter.jpg visual*.jpg scene*.png captions.ass
 
-      # =====================================================
-      # RENDER 1080x1920
-      # =====================================================
-
-      - name: Render 1080x1920 video
+      - name: Render cinematic animated scenes
         run: |
-          set -e
-
           DURATION=$(cat duration.txt)
 
-          SEGMENT=$(python3 -c \
-            "print(float('$DURATION') / 6.0)")
+          python3 - <<PY
+          d=float("$DURATION")
+          each=max(2.5,(d+1.75)/6.0)
+          open("scene_duration.txt","w").write(f"{each:.3f}")
+          print("Scene duration:", each)
+          PY
 
-          ffmpeg -y \
-            -loop 1 \
-            -t "$SEGMENT" \
-            -i scene1.png \
-            -loop 1 \
-            -t "$SEGMENT" \
-            -i scene2.png \
-            -loop 1 \
-            -t "$SEGMENT" \
-            -i scene3.png \
-            -loop 1 \
-            -t "$SEGMENT" \
-            -i scene4.png \
-            -loop 1 \
-            -t "$SEGMENT" \
-            -i scene5.png \
-            -loop 1 \
-            -t "$DURATION" \
-            -i scene6.png \
+          rm -f scene*.mp4
+          EACH=$(cat scene_duration.txt)
+
+          for i in 1 2 3 4 5 6; do
+            ffmpeg -y -loglevel error \
+              -loop 1 -i "scene${i}.png" \
+              -t "$EACH" \
+              -vf "zoompan=z='min(zoom+0.0010,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,eq=contrast=1.04:saturation=1.10,vignette=PI/5" \
+              -c:v libx264 -preset veryfast -crf 19 -pix_fmt yuv420p \
+              "scene${i}.mp4"
+          done
+
+          # Small crossfades make the scenes feel like a real edited Short.
+          ffmpeg -y -loglevel error \
+            -i scene1.mp4 -i scene2.mp4 -i scene3.mp4 -i scene4.mp4 -i scene5.mp4 -i scene6.mp4 \
+            -filter_complex "
+              [0:v][1:v]xfade=transition=fade:duration=0.35:offset=$(python3 -c 'd=float(open("scene_duration.txt").read()); print(f"{d-0.35:.3f}")')[v12];
+              [v12][2:v]xfade=transition=slideleft:duration=0.35:offset=$(python3 -c 'd=float(open("scene_duration.txt").read()); print(f"{2*d-0.70:.3f}")')[v123];
+              [v123][3:v]xfade=transition=fadeblack:duration=0.35:offset=$(python3 -c 'd=float(open("scene_duration.txt").read()); print(f"{3*d-1.05:.3f}")')[v1234];
+              [v1234][4:v]xfade=transition=slideright:duration=0.35:offset=$(python3 -c 'd=float(open("scene_duration.txt").read()); print(f"{4*d-1.40:.3f}")')[v12345];
+              [v12345][5:v]xfade=transition=fade:duration=0.35:offset=$(python3 -c 'd=float(open("scene_duration.txt").read()); print(f"{5*d-1.75:.3f}")')[vout]
+            " \
+            -map "[vout]" -c:v libx264 -preset veryfast -crf 19 -pix_fmt yuv420p \
+            -r 30 scenes.mp4
+
+          ffprobe -v error -show_entries stream=width,height,r_frame_rate -of default=noprint_wrappers=1 scenes.mp4
+
+      - name: Add captions and AI voice
+        run: |
+          ffmpeg -y -loglevel error \
+            -i scenes.mp4 \
             -i voice.mp3 \
-            -filter_complex "[0:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v0];[1:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v1];[2:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v2];[3:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v3];[4:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v4];[5:v]zoompan=z='min(zoom+0.0007,1.08)':d=1:s=1080x1920:fps=30[v5];[v0][v1][v2][v3][v4][v5]concat=n=6:v=1:a=0[vc];[vc]subtitles=captions.ass:fontsdir=/usr/share/fonts/truetype/dejavu[v]" \
-            -map "[v]" \
-            -map 6:a \
-            -t "$DURATION" \
+            -vf "ass=captions.ass" \
+            -map 0:v:0 \
+            -map 1:a:0 \
             -c:v libx264 \
             -preset veryfast \
-            -crf 21 \
+            -crf 20 \
             -pix_fmt yuv420p \
+            -r 30 \
             -c:a aac \
             -b:a 160k \
+            -shortest \
             -movflags +faststart \
             video.mp4
 
-          echo "===== VIDEO INFO ====="
-
-          ffprobe \
-            -v error \
-            -show_entries \
-            stream=width,height,codec_name \
+          ffprobe -v error \
+            -show_entries format=duration \
+            -show_entries stream=width,height,codec_name \
             -of default=noprint_wrappers=1 \
             video.mp4
 
-          ls -lh video.mp4
-
-      # =====================================================
-      # YOUTUBE UPLOAD
-      # =====================================================
-
       - name: Upload to YouTube
+        env:
+          UPLOAD_SECRET: ${{ secrets.UPLOAD_SECRET }}
         run: |
-          set -e
-
-          TITLE=$(cat title.txt | tr '\n' ' ' | sed 's/  */ /g')
-
-          DESCRIPTION=$(cat description.txt | tr '\n' ' ' | sed 's/  */ /g')
-
-          TAGS=$(cat tags.txt | tr '\n' ' ' | sed 's/  */ /g')
+          TITLE=$(cat title.txt)
+          DESCRIPTION=$(cat description.txt)
+          TAGS=$(cat tags.txt)
 
           HTTP_CODE=$(curl -sS \
             -X POST \
-            -H "X-Upload-Secret: ${{ secrets.UPLOAD_SECRET }}" \
+            -H "X-Upload-Secret: $UPLOAD_SECRET" \
             -H "X-Video-Title: $TITLE" \
             -H "X-Video-Description: $DESCRIPTION" \
             -H "X-Video-Tags: $TAGS" \
@@ -558,34 +438,21 @@ jobs:
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload")
 
           echo "Upload HTTP code: $HTTP_CODE"
-
-          echo "===== YOUTUBE RESPONSE ====="
-
           cat upload-response.txt
-
           if [ "$HTTP_CODE" != "200" ]; then
             exit 1
           fi
 
-      # =====================================================
-      # SAVE ARTIFACT
-      # =====================================================
-
-      - name: Save finished video
+      - name: Save finished video and assets
         uses: actions/upload-artifact@v4
         with:
-          name: ai-tools-daily-short
+          name: ai-tools-daily-v3
           path: |
             video.mp4
             script.txt
-            title.txt
-            description.txt
-            tags.txt
             voice.mp3
+            content.json
             captions.ass
-            scene1.png
-            scene2.png
-            scene3.png
-            scene4.png
-            scene5.png
-            scene6.png
+            presenter.jpg
+            visual*.jpg
+            scene*.png
