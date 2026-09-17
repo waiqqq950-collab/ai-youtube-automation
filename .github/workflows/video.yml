@@ -27,10 +27,16 @@ jobs:
 
       - name: Get AI content package
         run: |
-          curl -fsSL \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-content" \
-            -o content.json
+          http_code=$(curl -sS -o content.json -w "%{http_code}" "$WORKER_URL/daily-content")
 
+          echo "HTTP STATUS: $http_code"
+          echo "===== WORKER RESPONSE ====="
+          cat content.json
+          echo "===== END RESPONSE ====="
+
+          if [ "$http_code" -ge 400 ]; then
+          exit 1
+          fi
           python3 - <<'PY'
           import json, sys
           with open("content.json", "r", encoding="utf-8") as f:
