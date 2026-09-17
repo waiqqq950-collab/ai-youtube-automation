@@ -25,7 +25,8 @@ jobs:
           ffmpeg -version | head -n 1
           python3 --version
 
-      - name: Get AI content package
+      - name: Get AI content package env:
+          WORKER_URL: https://ai-youtube-automation.waiqqq950.workers.dev
         run: |
           http_code=$(curl -sS -o content.json -w "%{http_code}" "$WORKER_URL/daily-content")
 
