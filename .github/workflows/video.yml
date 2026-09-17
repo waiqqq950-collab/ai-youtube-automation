@@ -14,99 +14,54 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install video tools
+      - name: Install tools
         shell: bash
         run: |
           set -e
-          echo "Checking video tools..."
-
-          if ! command -v ffmpeg >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y ffmpeg
-          fi
-
-          if ! python3 -c "from PIL import Image" >/dev/null 2>&1; then
-            sudo apt-get update -qq
-            sudo apt-get install -y python3-pil
-          fi
-
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg python3-pil
           ffmpeg -version | head -n 1
-          python3 --version
           python3 -c "from PIL import Image; print('Pillow OK')"
 
-      - name: Get AI content package
+      - name: Get AI content
         shell: bash
         run: |
           set -e
+          URL="https://ai-youtube-automation.waiqqq950.workers.dev/daily-content"
 
-          WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
+          curl --fail-with-body --silent --show-error --location "$URL" -o content.json
 
-          echo "Calling:"
-          echo "$WORKER_URL/daily-content"
-
-          HTTP_CODE=$(curl -sS \
-            -o content.json \
-            -w "%{http_code}" \
-            "$WORKER_URL/daily-content")
-
-          echo "HTTP STATUS: $HTTP_CODE"
-          echo "===== WORKER RESPONSE ====="
+          echo "===== CONTENT ====="
           cat content.json
           echo
-          echo "===== END RESPONSE ====="
-
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            exit 1
-          fi
+          echo "===== END CONTENT ====="
 
           python3 - <<'PY'
           import json
-
           with open("content.json", encoding="utf-8") as f:
-              data = json.load(f)
+              d = json.load(f)
 
-          required = [
-              "title",
-              "hook",
-              "tool",
-              "script",
-              "benefit",
-              "example",
-              "tip",
-              "cta",
-              "visual_prompts",
-              "description",
-              "tags"
-          ]
+          for key in ["title","script","description","tags","visual_prompts"]:
+              if key not in d:
+                  raise SystemExit("Missing field: " + key)
 
-          for key in required:
-              if key not in data:
-                  raise SystemExit(f"Missing field: {key}")
-
-          if not str(data["script"]).strip():
+          if not d["script"].strip():
               raise SystemExit("Script is empty")
 
-          if not isinstance(data["visual_prompts"], list):
-              raise SystemExit("visual_prompts is not a list")
-
-          if len(data["visual_prompts"]) < 3:
+          if not isinstance(d["visual_prompts"], list) or len(d["visual_prompts"]) < 3:
               raise SystemExit("Need at least 3 visual prompts")
 
-          print("AI content validation: OK")
-          print("Title:", data["title"])
-          print("Tool:", data["tool"])
+          print("Content OK")
 
       - name: Generate AI presenter
         shell: bash
         run: |
           set -e
 
-          WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
-
-          curl -fSL --get \
+          curl --fail-with-body --silent --show-error --location --request POST \
             --data-urlencode "prompt=Realistic friendly professional AI presenter speaking directly to camera in a modern technology studio, waist-up, natural confident expression, premium cinematic lighting, dark modern background, vertical 9:16, no readable text, no logos" \
             --data-urlencode "seed=424242" \
-            "$WORKER_URL/daily-image" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
             -o presenter.jpg
 
           test -s presenter.jpg
@@ -116,14 +71,12 @@ jobs:
         shell: bash
         run: |
           set -e
+          P=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][0])')
 
-          WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
-          PROMPT=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][0])')
-
-          curl -fSL --get \
-            --data-urlencode "prompt=$PROMPT" \
+          curl --fail-with-body --silent --show-error --location --request POST \
+            --data-urlencode "prompt=$P" \
             --data-urlencode "seed=1001" \
-            "$WORKER_URL/daily-image" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
             -o visual1.jpg
 
           test -s visual1.jpg
@@ -133,14 +86,12 @@ jobs:
         shell: bash
         run: |
           set -e
+          P=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][1])')
 
-          WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
-          PROMPT=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][1])')
-
-          curl -fSL --get \
-            --data-urlencode "prompt=$PROMPT" \
+          curl --fail-with-body --silent --show-error --location --request POST \
+            --data-urlencode "prompt=$P" \
             --data-urlencode "seed=1002" \
-            "$WORKER_URL/daily-image" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
             -o visual2.jpg
 
           test -s visual2.jpg
@@ -150,14 +101,12 @@ jobs:
         shell: bash
         run: |
           set -e
+          P=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][2])')
 
-          WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
-          PROMPT=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][2])')
-
-          curl -fSL --get \
-            --data-urlencode "prompt=$PROMPT" \
+          curl --fail-with-body --silent --show-error --location --request POST \
+            --data-urlencode "prompt=$P" \
             --data-urlencode "seed=1003" \
-            "$WORKER_URL/daily-image" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
             -o visual3.jpg
 
           test -s visual3.jpg
@@ -167,26 +116,22 @@ jobs:
         shell: bash
         run: |
           set -e
-
-          WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
           SCRIPT=$(python3 -c 'import json; print(json.load(open("content.json"))["script"])')
 
-          curl -fSL --get \
+          curl --fail-with-body --silent --show-error --location --get \
             --data-urlencode "script=$SCRIPT" \
-            "$WORKER_URL/daily-audio" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
             -o voice.mp3
 
           test -s voice.mp3
           file voice.mp3
 
-          DURATION=$(ffprobe -v error \
+          ffprobe -v error \
             -show_entries format=duration \
             -of default=nw=1:nk=1 \
-            voice.mp3)
+            voice.mp3
 
-          echo "Voice duration: $DURATION seconds"
-
-      - name: Build captions
+      - name: Create captions
         shell: bash
         run: |
           set -e
@@ -197,30 +142,27 @@ jobs:
           import subprocess
 
           with open("content.json", encoding="utf-8") as f:
-              data = json.load(f)
+              d = json.load(f)
 
-          words = re.findall(r"\S+", data["script"])
-          chunks = [
-              " ".join(words[i:i+5])
-              for i in range(0, len(words), 5)
-          ]
+          words = re.findall(r"\S+", d["script"])
+          chunks = [" ".join(words[i:i+5]) for i in range(0, len(words), 5)]
 
           duration = float(subprocess.check_output([
-              "ffprobe", "-v", "error",
-              "-show_entries", "format=duration",
-              "-of", "default=nw=1:nk=1",
-              "voice.mp3"
+              "ffprobe","-v","error",
+              "-show_entries","format=duration",
+              "-of","default=nw=1:nk=1","voice.mp3"
           ], text=True).strip())
 
           per = duration / max(1, len(chunks))
 
-          def ass_time(seconds):
-              h = int(seconds // 3600)
-              m = int((seconds % 3600) // 60)
-              s = seconds % 60
-              return f"{h}:{m:02d}:{s:05.2f}".replace(".", ",")
+          def t(x):
+              h=int(x//3600)
+              m=int((x%3600)//60)
+              s=x%60
+              return f"{h}:{m:02d}:{s:05.2f}".replace(".",",")
 
-          header = """[Script Info]
+          with open("captions.ass","w",encoding="utf-8") as f:
+              f.write("""[Script Info]
           ScriptType: v4.00+
           PlayResX: 1080
           PlayResY: 1920
@@ -231,37 +173,22 @@ jobs:
 
           [Events]
           Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-          """
-
-          with open("captions.ass", "w", encoding="utf-8") as f:
-              f.write(header)
-
-              for i, chunk in enumerate(chunks):
-                  start = i * per
-                  end = min(duration, (i + 1) * per)
-                  f.write(
-                      f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{chunk}\n"
-                  )
-
-          print("Captions created.")
+          """)
+              for i,c in enumerate(chunks):
+                  f.write(f"Dialogue: 0,{t(i*per)},{t(min(duration,(i+1)*per))},Default,,0,0,0,,{c}\n")
+          print("Captions OK")
           PY
 
-      - name: Build six animated scenes
+      - name: Render six scenes
         shell: bash
         run: |
           set -e
 
-          DURATION=$(ffprobe -v error \
-            -show_entries format=duration \
-            -of default=nw=1:nk=1 \
-            voice.mp3)
+          D=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 voice.mp3)
+          EACH=$(python3 -c "print(max(3.5, float('$D') / 6.0))")
 
-          EACH=$(python3 -c "d=float('$DURATION'); print(max(3.5,d/6.0))")
-
-          echo "Scene duration: $EACH"
-
-          for i in 1 2 3 4 5 6; do
-            case "$i" in
+          for N in 1 2 3 4 5 6; do
+            case "$N" in
               1) IMG="presenter.jpg" ;;
               2) IMG="visual1.jpg" ;;
               3) IMG="visual2.jpg" ;;
@@ -270,19 +197,10 @@ jobs:
               6) IMG="visual1.jpg" ;;
             esac
 
-            echo "Creating scene $i from $IMG"
-
-            ffmpeg -y \
-              -loop 1 \
-              -i "$IMG" \
-              -t "$EACH" \
+            ffmpeg -y -loop 1 -i "$IMG" -t "$EACH" \
               -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.0015,1.12)':d=1:s=1080x1920:fps=30,eq=contrast=1.05:saturation=1.08,format=yuv420p" \
-              -an \
-              -c:v libx264 \
-              -preset veryfast \
-              -crf 23 \
-              -pix_fmt yuv420p \
-              "scene${i}.mp4"
+              -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
+              "scene${N}.mp4"
           done
 
       - name: Render final video
@@ -290,39 +208,14 @@ jobs:
         run: |
           set -e
 
-          printf "file '%s'\n" \
-            scene1.mp4 \
-            scene2.mp4 \
-            scene3.mp4 \
-            scene4.mp4 \
-            scene5.mp4 \
-            scene6.mp4 > scenes.txt
+          printf "file '%s'\n" scene1.mp4 scene2.mp4 scene3.mp4 scene4.mp4 scene5.mp4 scene6.mp4 > scenes.txt
 
-          ffmpeg -y \
-            -f concat \
-            -safe 0 \
-            -i scenes.txt \
-            -c copy \
-            base.mp4
+          ffmpeg -y -f concat -safe 0 -i scenes.txt -c copy base.mp4
 
-          ffmpeg -y \
-            -i base.mp4 \
-            -i voice.mp3 \
+          ffmpeg -y -i base.mp4 -i voice.mp3 \
             -vf "subtitles=captions.ass,drawbox=x=0:y=0:w=iw:h=170:color=black@0.45:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=46:x=(w-text_w)/2:y=55" \
-            -c:v libx264 \
-            -preset veryfast \
-            -crf 22 \
-            -c:a aac \
-            -b:a 128k \
-            -shortest \
-            -movflags +faststart \
-            video.mp4
-
-          echo "===== FINAL VIDEO ====="
-          ffprobe -v error \
-            -show_entries format=duration,size \
-            -of default=nw=1 \
-            video.mp4
+            -c:v libx264 -preset veryfast -crf 22 \
+            -c:a aac -b:a 128k -shortest -movflags +faststart video.mp4
 
           test -s video.mp4
 
@@ -333,34 +226,20 @@ jobs:
         run: |
           set -e
 
-          WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
-
           TITLE=$(python3 -c 'import json; print(json.load(open("content.json"))["title"])')
           DESCRIPTION=$(python3 -c 'import json; print(json.load(open("content.json"))["description"])')
           TAGS=$(python3 -c 'import json; print(",".join(json.load(open("content.json"))["tags"]))')
 
-          HTTP_CODE=$(curl -sS \
-            -o upload.json \
-            -w "%{http_code}" \
+          curl --fail-with-body --silent --show-error --location \
             -X POST \
-            "$WORKER_URL/youtube/upload" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload" \
             -H "X-Upload-Secret: $UPLOAD_SECRET" \
             -F "video=@video.mp4;type=video/mp4" \
             -F "title=$TITLE" \
             -F "description=$DESCRIPTION" \
-            -F "tags=$TAGS")
+            -F "tags=$TAGS"
 
-          echo "UPLOAD HTTP STATUS: $HTTP_CODE"
-          echo "===== YOUTUBE RESPONSE ====="
-          cat upload.json
-          echo
-          echo "===== END RESPONSE ====="
-
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            exit 1
-          fi
-
-      - name: Save video artifact
+      - name: Save artifact
         uses: actions/upload-artifact@v4
         with:
           name: ai-tools-daily-video
