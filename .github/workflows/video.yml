@@ -149,15 +149,16 @@ jobs:
           PY
 
           file presenter.jpg visual1.jpg visual2.jpg visual3.jpg
-
       - name: Create AI voice
         run: |
           set -e
 
+          SCRIPT=$(cat script.txt)
+
           HTTP_CODE=$(curl -sS \
             -X POST \
-            -H "Content-Type: text/plain; charset=utf-8" \
-            --data-binary "@script.txt" \
+            -H "Content-Type: application/json" \
+            --data "$(python3 -c 'import json,sys; print(json.dumps({"script":sys.stdin.read()}))' < script.txt)" \
             -o voice.mp3 \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio")
