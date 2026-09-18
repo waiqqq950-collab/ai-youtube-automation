@@ -440,10 +440,10 @@ jobs:
             -of default=noprint_wrappers=1 \
             video.mp4
 
-           - name: Upload to YouTube
+      - name: Upload to YouTube
         env:
           UPLOAD_SECRET: ${{ secrets.UPLOAD_SECRET }}
-         run: |
+        run: |
           set -e
 
           TITLE=$(cat title.txt)
