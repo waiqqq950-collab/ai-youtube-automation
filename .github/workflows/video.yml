@@ -440,10 +440,12 @@ jobs:
             -of default=noprint_wrappers=1 \
             video.mp4
 
-      - name: Upload to YouTube
+           - name: Upload to YouTube
         env:
           UPLOAD_SECRET: ${{ secrets.UPLOAD_SECRET }}
         run: |
+          set -e
+
           TITLE=$(cat title.txt)
           DESCRIPTION=$(cat description.txt)
           TAGS=$(cat tags.txt)
@@ -451,21 +453,21 @@ jobs:
           HTTP_CODE=$(curl -sS \
             -X POST \
             -H "X-Upload-Secret: $UPLOAD_SECRET" \
-            -H "X-Video-Title: $TITLE" \
-            -H "X-Video-Description: $DESCRIPTION" \
-            -H "X-Video-Tags: $TAGS" \
-            -H "Content-Type: video/mp4" \
-            --data-binary "@video.mp4" \
+            -F "video=@video.mp4;type=video/mp4" \
+            -F "title=$TITLE" \
+            -F "description=$DESCRIPTION" \
+            -F "tags=$TAGS" \
             -o upload-response.txt \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload")
 
           echo "Upload HTTP code: $HTTP_CODE"
+          echo "===== UPLOAD RESPONSE ====="
           cat upload-response.txt
+
           if [ "$HTTP_CODE" != "200" ]; then
             exit 1
           fi
-
       - name: Save finished video and assets
         uses: actions/upload-artifact@v4
         with:
