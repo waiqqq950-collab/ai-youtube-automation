@@ -443,7 +443,7 @@ jobs:
            - name: Upload to YouTube
         env:
           UPLOAD_SECRET: ${{ secrets.UPLOAD_SECRET }}
-        run: |
+         run: |
           set -e
 
           TITLE=$(cat title.txt)
