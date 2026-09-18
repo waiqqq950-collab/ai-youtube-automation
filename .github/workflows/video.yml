@@ -1,9 +1,16 @@
-name: AI Tools Daily - Create Video
+name: AI Tools Daily - HeyGen Presenter V4
 
 on:
   workflow_dispatch:
   schedule:
     - cron: "0 2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-tools-daily-video
+  cancel-in-progress: false
 
 jobs:
   create-video:
@@ -11,240 +18,286 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install tools
-        shell: bash
+      - name: Get AI content package
         run: |
           set -e
-          sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg python3-pil
-          ffmpeg -version | head -n 1
-          python3 -c "from PIL import Image; print('Pillow OK')"
+          curl -fsSL \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-content" \
+            -o content.json
 
-      - name: Get AI content
-        shell: bash
+          python3 - <<'PY'
+          import json, sys
+
+          with open("content.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          if "error" in data:
+              print("WORKER ERROR:")
+              print(data["error"])
+              sys.exit(1)
+
+          required = ["title", "script", "description", "tags"]
+          missing = [x for x in required if not data.get(x)]
+          if missing:
+              print("Missing fields:", missing)
+              sys.exit(1)
+
+          with open("script.txt", "w", encoding="utf-8") as f:
+              f.write(str(data["script"]).strip())
+
+          with open("title.txt", "w", encoding="utf-8") as f:
+              f.write(str(data["title"]).strip())
+
+          with open("description.txt", "w", encoding="utf-8") as f:
+              f.write(str(data["description"]).strip())
+
+          with open("tags.txt", "w", encoding="utf-8") as f:
+              f.write(",".join(str(x).strip() for x in data["tags"] if str(x).strip()))
+
+          print("===== TITLE =====")
+          print(data["title"])
+          print("===== SCRIPT =====")
+          print(data["script"])
+          PY
+
+      - name: Generate HeyGen presenter video
+        env:
+          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
         run: |
           set -e
-          URL="https://ai-youtube-automation.waiqqq950.workers.dev/daily-content"
-
-          curl --fail-with-body --silent --show-error --location "$URL" -o content.json
-
-          echo "===== CONTENT ====="
-          cat content.json
-          echo
-          echo "===== END CONTENT ====="
 
           python3 - <<'PY'
           import json
-          with open("content.json", encoding="utf-8") as f:
-              d = json.load(f)
+          from pathlib import Path
 
-          for key in ["title","script","description","tags","visual_prompts"]:
-              if key not in d:
-                  raise SystemExit("Missing field: " + key)
+          script = Path("script.txt").read_text(encoding="utf-8").strip()
+          title = Path("title.txt").read_text(encoding="utf-8").strip()
 
-          if not d["script"].strip():
-              raise SystemExit("Script is empty")
+          prompt = f"""
+          Create a polished 35 to 50 second YouTube Short in PORTRAIT 9:16 for the channel "AI Tools Daily".
 
-          if not isinstance(d["visual_prompts"], list) or len(d["visual_prompts"]) < 3:
-              raise SystemExit("Need at least 3 visual prompts")
+          Topic/title:
+          {title}
 
-          print("Content OK")
+          Use this EXACT narration/script. Do not rewrite it, shorten it, or add facts:
+          {script}
 
-      - name: Generate AI presenter
-        shell: bash
+          VISUAL STYLE:
+          - Use a realistic professional male AI presenter as the main on-camera host.
+          - The presenter should look directly at the viewer and naturally speak the narration.
+          - Use natural facial expressions, eye movement, head movement and hand gestures.
+          - Keep the presenter visually engaging; do not use a frozen still image.
+          - Change the visual composition frequently to maintain attention.
+          - Add topic-relevant B-roll, UI-style graphics, animated callouts, icons, charts or simple motion graphics when they help explain the topic.
+          - Use clean modern AI/technology aesthetics, premium lighting and strong visual hierarchy.
+          - Use smooth but noticeable scene transitions and motion.
+          - Avoid generic stock-footage feeling.
+          - Do NOT make the video a slideshow of static cards.
+          - Do NOT put large paragraphs on screen.
+          - Keep on-screen text short, readable and synchronized with the narration.
+          - Burn in concise captions/subtitles.
+          - Use a strong visual hook in the first 1-2 seconds.
+          - End with a clear visual CTA: "Subscribe for more AI tips."
+          - No fake statistics, no unsupported claims, no watermarks, no logos other than the channel name if appropriate.
+          - English language.
+          - Designed specifically for YouTube Shorts retention.
+          """
+
+          Path("heygen_request.json").write_text(
+              json.dumps({
+                  "prompt": prompt,
+                  "orientation": "portrait"
+              }),
+              encoding="utf-8"
+          )
+          PY
+
+          echo "Starting HeyGen Video Agent..."
+
+          HTTP_CODE=$(curl -sS \
+            -X POST \
+            -H "X-Api-Key: $HEYGEN_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data-binary @heygen_request.json \
+            -o heygen-create.json \
+            -w "%{http_code}" \
+            "https://api.heygen.com/v3/video-agents")
+
+          echo "HeyGen create HTTP code: $HTTP_CODE"
+          cat heygen-create.json
+
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            exit 1
+          fi
+
+          SESSION_ID=$(python3 - <<'PY'
+          import json
+          d=json.load(open("heygen-create.json"))
+          print(d["data"]["session_id"])
+          PY
+          )
+
+          echo "SESSION_ID=$SESSION_ID" >> "$GITHUB_ENV"
+          echo "HeyGen session: $SESSION_ID"
+
+      - name: Wait for HeyGen video
+        env:
+          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
         run: |
           set -e
 
-          curl --fail-with-body --silent --show-error --location --request POST \
-            --data-urlencode "prompt=Realistic friendly professional AI presenter speaking directly to camera in a modern technology studio, waist-up, natural confident expression, premium cinematic lighting, dark modern background, vertical 9:16, no readable text, no logos" \
-            --data-urlencode "seed=424242" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
-            -o presenter.jpg
+          VIDEO_ID=""
 
-          test -s presenter.jpg
-          file presenter.jpg
+          for i in $(seq 1 60); do
+            echo "HeyGen session check $i/60..."
 
-      - name: Generate topic visual 1
-        shell: bash
+            curl -fsSL \
+              -H "X-Api-Key: $HEYGEN_API_KEY" \
+              "https://api.heygen.com/v3/video-agents/$SESSION_ID" \
+              -o heygen-session.json
+
+            cat heygen-session.json
+
+            STATUS=$(python3 - <<'PY'
+            import json
+            d=json.load(open("heygen-session.json"))
+            print(d.get("data",{}).get("status","unknown"))
+            PY
+            )
+
+            echo "Session status: $STATUS"
+
+            VIDEO_ID=$(python3 - <<'PY'
+            import json
+            d=json.load(open("heygen-session.json"))
+            print(d.get("data",{}).get("video_id") or "")
+            PY
+            )
+
+            if [ -n "$VIDEO_ID" ]; then
+              echo "VIDEO_ID=$VIDEO_ID" >> "$GITHUB_ENV"
+              break
+            fi
+
+            if [ "$STATUS" = "failed" ]; then
+              exit 1
+            fi
+
+            sleep 15
+          done
+
+          if [ -z "$VIDEO_ID" ]; then
+            echo "HeyGen did not return a video_id within the waiting period."
+            exit 1
+          fi
+
+          echo "HeyGen VIDEO_ID=$VIDEO_ID"
+
+      - name: Download completed HeyGen video
+        env:
+          HEYGEN_API_KEY: ${{ secrets.HEYGEN_API_KEY }}
         run: |
           set -e
-          P=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][0])')
 
-          curl --fail-with-body --silent --show-error --location --request POST \
-            --data-urlencode "prompt=$P" \
-            --data-urlencode "seed=1001" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
-            -o visual1.jpg
+          VIDEO_URL=""
 
-          test -s visual1.jpg
-          file visual1.jpg
+          for i in $(seq 1 60); do
+            echo "Render check $i/60..."
 
-      - name: Generate topic visual 2
-        shell: bash
-        run: |
-          set -e
-          P=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][1])')
+            curl -fsSL \
+              -H "X-Api-Key: $HEYGEN_API_KEY" \
+              "https://api.heygen.com/v3/videos/$VIDEO_ID" \
+              -o heygen-video.json
 
-          curl --fail-with-body --silent --show-error --location --request POST \
-            --data-urlencode "prompt=$P" \
-            --data-urlencode "seed=1002" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
-            -o visual2.jpg
+            cat heygen-video.json
 
-          test -s visual2.jpg
-          file visual2.jpg
+            STATUS=$(python3 - <<'PY'
+            import json
+            d=json.load(open("heygen-video.json"))
+            print(d.get("data",{}).get("status","unknown"))
+            PY
+            )
 
-      - name: Generate topic visual 3
-        shell: bash
-        run: |
-          set -e
-          P=$(python3 -c 'import json; print(json.load(open("content.json"))["visual_prompts"][2])')
+            echo "Video status: $STATUS"
 
-          curl --fail-with-body --silent --show-error --location --request POST \
-            --data-urlencode "prompt=$P" \
-            --data-urlencode "seed=1003" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image" \
-            -o visual3.jpg
+            if [ "$STATUS" = "completed" ]; then
+              VIDEO_URL=$(python3 - <<'PY'
+              import json
+              d=json.load(open("heygen-video.json"))
+              print(d.get("data",{}).get("video_url") or "")
+              PY
+              )
+              break
+            fi
 
-          test -s visual3.jpg
-          file visual3.jpg
+            if [ "$STATUS" = "failed" ]; then
+              python3 - <<'PY'
+              import json
+              d=json.load(open("heygen-video.json"))
+              data=d.get("data",{})
+              print("HeyGen failure:", data.get("failure_message"))
+              print("Failure code:", data.get("failure_code"))
+              PY
+              exit 1
+            fi
 
-      - name: Create AI voice
-        shell: bash
-        run: |
-          set -e
-          SCRIPT=$(python3 -c 'import json; print(json.load(open("content.json"))["script"])')
+            sleep 15
+          done
 
-          curl --fail-with-body --silent --show-error --location --get \
-            --data-urlencode "script=$SCRIPT" \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio" \
-            -o voice.mp3
+          if [ -z "$VIDEO_URL" ]; then
+            echo "HeyGen video did not complete within the waiting period."
+            exit 1
+          fi
 
-          test -s voice.mp3
-          file voice.mp3
+          echo "Downloading final video..."
+          curl -fL "$VIDEO_URL" -o video.mp4
+
+          test -s video.mp4
+          file video.mp4
 
           ffprobe -v error \
             -show_entries format=duration \
-            -of default=nw=1:nk=1 \
-            voice.mp3
-
-      - name: Create captions
-        shell: bash
-        run: |
-          set -e
-
-          python3 - <<'PY'
-          import json
-          import re
-          import subprocess
-
-          with open("content.json", encoding="utf-8") as f:
-              d = json.load(f)
-
-          words = re.findall(r"\S+", d["script"])
-          chunks = [" ".join(words[i:i+5]) for i in range(0, len(words), 5)]
-
-          duration = float(subprocess.check_output([
-              "ffprobe","-v","error",
-              "-show_entries","format=duration",
-              "-of","default=nw=1:nk=1","voice.mp3"
-          ], text=True).strip())
-
-          per = duration / max(1, len(chunks))
-
-          def t(x):
-              h=int(x//3600)
-              m=int((x%3600)//60)
-              s=x%60
-              return f"{h}:{m:02d}:{s:05.2f}".replace(".",",")
-
-          with open("captions.ass","w",encoding="utf-8") as f:
-              f.write("""[Script Info]
-          ScriptType: v4.00+
-          PlayResX: 1080
-          PlayResY: 1920
-
-          [V4+ Styles]
-          Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-          Style: Default,DejaVu Sans,58,&H00FFFFFF,&H00FFFFFF,&H00111111,&H80111111,-1,0,0,0,100,100,0,0,1,4,2,2,60,60,240,1
-
-          [Events]
-          Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-          """)
-              for i,c in enumerate(chunks):
-                  f.write(f"Dialogue: 0,{t(i*per)},{t(min(duration,(i+1)*per))},Default,,0,0,0,,{c}\n")
-          print("Captions OK")
-          PY
-
-      - name: Render six scenes
-        shell: bash
-        run: |
-          set -e
-
-          D=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 voice.mp3)
-          EACH=$(python3 -c "print(max(3.5, float('$D') / 6.0))")
-
-          for N in 1 2 3 4 5 6; do
-            case "$N" in
-              1) IMG="presenter.jpg" ;;
-              2) IMG="visual1.jpg" ;;
-              3) IMG="visual2.jpg" ;;
-              4) IMG="visual3.jpg" ;;
-              5) IMG="presenter.jpg" ;;
-              6) IMG="visual1.jpg" ;;
-            esac
-
-            ffmpeg -y -loop 1 -i "$IMG" -t "$EACH" \
-              -vf "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,zoompan=z='min(zoom+0.0015,1.12)':d=1:s=1080x1920:fps=30,eq=contrast=1.05:saturation=1.08,format=yuv420p" \
-              -an -c:v libx264 -preset veryfast -crf 23 -pix_fmt yuv420p \
-              "scene${N}.mp4"
-          done
-
-      - name: Render final video
-        shell: bash
-        run: |
-          set -e
-
-          printf "file '%s'\n" scene1.mp4 scene2.mp4 scene3.mp4 scene4.mp4 scene5.mp4 scene6.mp4 > scenes.txt
-
-          ffmpeg -y -f concat -safe 0 -i scenes.txt -c copy base.mp4
-
-          ffmpeg -y -i base.mp4 -i voice.mp3 \
-            -vf "subtitles=captions.ass,drawbox=x=0:y=0:w=iw:h=170:color=black@0.45:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=46:x=(w-text_w)/2:y=55" \
-            -c:v libx264 -preset veryfast -crf 22 \
-            -c:a aac -b:a 128k -shortest -movflags +faststart video.mp4
-
-          test -s video.mp4
+            -show_entries stream=width,height,codec_name \
+            -of default=noprint_wrappers=1 \
+            video.mp4
 
       - name: Upload to YouTube
-        shell: bash
         env:
           UPLOAD_SECRET: ${{ secrets.UPLOAD_SECRET }}
         run: |
           set -e
 
-          TITLE=$(python3 -c 'import json; print(json.load(open("content.json"))["title"])')
-          DESCRIPTION=$(python3 -c 'import json; print(json.load(open("content.json"))["description"])')
-          TAGS=$(python3 -c 'import json; print(",".join(json.load(open("content.json"))["tags"]))')
+          TITLE=$(cat title.txt)
+          DESCRIPTION=$(cat description.txt)
+          TAGS=$(cat tags.txt)
 
-          curl --fail-with-body --silent --show-error --location \
+          HTTP_CODE=$(curl -sS \
             -X POST \
-            "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload" \
             -H "X-Upload-Secret: $UPLOAD_SECRET" \
-            -F "video=@video.mp4;type=video/mp4" \
-            -F "title=$TITLE" \
-            -F "description=$DESCRIPTION" \
-            -F "tags=$TAGS"
+            -H "X-Video-Title: $TITLE" \
+            -H "X-Video-Description: $DESCRIPTION" \
+            -H "X-Video-Tags: $TAGS" \
+            -H "Content-Type: video/mp4" \
+            --data-binary "@video.mp4" \
+            -o upload-response.txt \
+            -w "%{http_code}" \
+            "https://ai-youtube-automation.waiqqq950.workers.dev/youtube/upload")
 
-      - name: Save artifact
+          echo "YouTube upload HTTP code: $HTTP_CODE"
+          cat upload-response.txt
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            exit 1
+          fi
+
+      - name: Save finished video
         uses: actions/upload-artifact@v4
         with:
-          name: ai-tools-daily-video
+          name: ai-tools-daily-heygen-v4
           path: |
             video.mp4
+            script.txt
             content.json
-            voice.mp3
-          retention-days: 7
+            heygen-create.json
+            heygen-session.json
+            heygen-video.json
