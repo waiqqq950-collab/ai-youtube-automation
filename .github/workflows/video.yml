@@ -152,15 +152,18 @@ jobs:
 
       - name: Create AI voice
         run: |
+          set -e
+
           HTTP_CODE=$(curl -sS \
             -X POST \
-            -H "Content-Type: text/plain" \
+            -H "Content-Type: text/plain; charset=utf-8" \
             --data-binary "@script.txt" \
             -o voice.mp3 \
             -w "%{http_code}" \
             "https://ai-youtube-automation.waiqqq950.workers.dev/daily-audio")
 
           echo "Audio HTTP code: $HTTP_CODE"
+
           if [ "$HTTP_CODE" != "200" ]; then
             echo "===== AUDIO ERROR ====="
             cat voice.mp3 || true
@@ -168,6 +171,7 @@ jobs:
           fi
 
           test -s voice.mp3
+
           file voice.mp3
 
       - name: Measure voice
