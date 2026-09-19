@@ -83,7 +83,7 @@ jobs:
               raise SystemExit("Need at least 3 visual prompts")
 
           words = re.findall(r"\S+", data["script"])
-          if len(words) > 80:
+          if len(words) > 100:
               raise SystemExit(f"Script too long: {len(words)} words")
 
           open("script.txt", "w", encoding="utf-8").write(data["script"].strip())
