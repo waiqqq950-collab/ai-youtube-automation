@@ -109,17 +109,16 @@ jobs:
           WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
 
           python3 - <<'PY'
-          import json, urllib.request, urllib.parse, urllib.error
+          import json, urllib.request, urllib.error
 
           BASE = "https://ai-youtube-automation.waiqqq950.workers.dev/daily-image"
 
           with open("content.json", encoding="utf-8") as f:
               data = json.load(f)
 
-          def generate(filename, prompt, seed):
+          def generate(filename, prompt):
               payload = json.dumps({
-                  "prompt": prompt,
-                  "seed": int(seed)
+                  "prompt": prompt
               }).encode("utf-8")
 
               req = urllib.request.Request(
@@ -152,11 +151,11 @@ jobs:
               "clean dark background, vertical composition"
           )
 
-          generate("presenter.jpg", presenter_prompt, 424242)
+          generate("presenter.jpg", presenter_prompt)
 
           prompts = data["visual_prompts"][:3]
           for i, prompt in enumerate(prompts, start=1):
-              generate(f"visual{i}.jpg", prompt, 5000 + i)
+              generate(f"visual{i}.jpg", prompt)
 
           PY
 
