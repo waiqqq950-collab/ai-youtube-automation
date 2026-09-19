@@ -117,18 +117,19 @@ jobs:
               data = json.load(f)
 
           def generate(filename, prompt, seed):
-              params = urllib.parse.urlencode({
+              payload = json.dumps({
                   "prompt": prompt,
-                  "seed": str(seed)
-              })
-              url = BASE + "?" + params
+                  "seed": int(seed)
+              }).encode("utf-8")
 
               req = urllib.request.Request(
-                  url,
+                  BASE,
+                  data=payload,
                   headers={
+                      "Content-Type": "application/json",
                       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36"
                   },
-                  method="GET"
+                  method="POST"
               )
 
               try:
@@ -167,12 +168,10 @@ jobs:
           set -e
 
           WORKER_URL="https://ai-youtube-automation.waiqqq950.workers.dev"
-          SCRIPT_JSON=$(python3 -c 'import json; print(json.dumps({"script": open("script.txt", encoding="utf-8").read()}))')
-
           HTTP_CODE=$(curl -sS \
             -X POST \
-            -H "Content-Type: application/json" \
-            --data "$SCRIPT_JSON" \
+            -H "Content-Type: text/plain; charset=utf-8" \
+            --data-binary "@script.txt" \
             -o voice.mp3 \
             -w "%{http_code}" \
             "$WORKER_URL/daily-audio")
