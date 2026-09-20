@@ -328,7 +328,7 @@ jobs:
             silent.mp4
 
           # Use a second render pass for robust audio/captions and a subtle top brand.
-          ffmpeg -y \
+                   ffmpeg -y \
             -i silent.mp4 \
             -i voice.mp3 \
             -vf "subtitles=captions.ass,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=34:x=45:y=55:alpha=0.78" \
@@ -339,7 +339,11 @@ jobs:
             -crf 22 \
             -pix_fmt yuv420p \
             -c:a aac \
+            -profile:a aac_low \
+            -ar 48000 \
+            -ac 2 \
             -b:a 128k \
+            -af "aresample=48000:async=1:first_pts=0" \
             -shortest \
             -movflags +faststart \
             video.mp4
