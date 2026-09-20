@@ -299,14 +299,19 @@ jobs:
           EACH3_MINUS_105=$(python3 -c "e=float('$EACH'); print(max(0,3*e-1.05))")
           EACH4_MINUS_140=$(python3 -c "e=float('$EACH'); print(max(0,4*e-1.40))")
 
-          # Text is short on purpose: the video should show the idea, not become a slideshow.
           HOOK=$(python3 -c 'import json; print(json.load(open("content.json"))["hook"].replace(":", "\\:").replace("\x27", "\x27\x27"))')
           TOOL=$(python3 -c 'import json; print(json.load(open("content.json"))["tool"].replace(":", "\\:").replace("\x27", "\x27\x27"))')
           BENEFIT=$(python3 -c 'import json; print(json.load(open("content.json"))["benefit"].replace(":", "\\:").replace("\x27", "\x27\x27"))')
           CTA=$(python3 -c 'import json; print(json.load(open("content.json"))["cta"].replace(":", "\\:").replace("\x27", "\x27\x27"))')
 
+          echo "===== PASS 1: BUILD VIDEO SCENES ====="
+
           ffmpeg -y \
-            -i scene1.mp4 -i scene2.mp4 -i scene3.mp4 -i scene4.mp4 -i scene5.mp4 \
+            -i scene1.mp4 \
+            -i scene2.mp4 \
+            -i scene3.mp4 \
+            -i scene4.mp4 \
+            -i scene5.mp4 \
             -filter_complex "
               [0:v]drawbox=x=55:y=120:w=970:h=250:color=black@0.48:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='${HOOK}':fontcolor=white:fontsize=68:line_spacing=8:x=(w-text_w)/2:y=180:enable='between(t,0,${EACH})'[v0];
               [1:v]drawbox=x=70:y=125:w=940:h=170:color=black@0.50:t=fill,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='TRY: ${TOOL}':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=175[v1];
@@ -322,12 +327,24 @@ jobs:
             -an \
             -c:v libx264 \
             -preset veryfast \
-            -crf 21 \
+            -profile:v high \
+            -level:v 4.2 \
             -pix_fmt yuv420p \
+            -r 30 \
+            -fps_mode cfr \
+            -g 60 \
+            -keyint_min 60 \
+            -sc_threshold 0 \
+            -bf 2 \
+            -flags +cgop \
+            -crf 21 \
+            -movflags +faststart \
+            -use_editlist 0 \
             silent.mp4
 
-          # Use a second render pass for robust audio/captions and a subtle top brand.
-                   ffmpeg -y \
+          echo "===== PASS 2: FINAL YOUTUBE FILE ====="
+
+          ffmpeg -y \
             -i silent.mp4 \
             -i voice.mp3 \
             -vf "subtitles=captions.ass,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=34:x=45:y=55:alpha=0.78" \
@@ -335,8 +352,17 @@ jobs:
             -map 1:a:0 \
             -c:v libx264 \
             -preset veryfast \
-            -crf 22 \
+            -profile:v high \
+            -level:v 4.2 \
             -pix_fmt yuv420p \
+            -r 30 \
+            -fps_mode cfr \
+            -g 60 \
+            -keyint_min 60 \
+            -sc_threshold 0 \
+            -bf 2 \
+            -flags +cgop \
+            -crf 22 \
             -c:a aac \
             -profile:a aac_low \
             -ar 48000 \
@@ -345,15 +371,35 @@ jobs:
             -af "aresample=48000:async=1:first_pts=0" \
             -shortest \
             -movflags +faststart \
+            -use_editlist 0 \
             video.mp4
 
+          echo "===== FINAL VIDEO CHECK ====="
+
           ffprobe -v error \
-            -show_entries format=duration,size \
-            -show_entries stream=width,height,codec_name \
+            -show_entries format=duration,size,format_name \
+            -show_entries stream=index,codec_name,profile,level,width,height,pix_fmt,r_frame_rate,avg_frame_rate,sample_rate,channels,channel_layout,bit_rate \
             -of default=nw=1 \
             video.mp4
 
+          echo "===== DECODE CHECK ====="
+
+          ffmpeg -v error \
+            -i video.mp4 \
+            -f null -
+
+          echo "===== EDIT LIST CHECK ====="
+
+          if ffprobe -v error \
+            -show_entries format_tags=major_brand \
+            -of default=nw=1 \
+            video.mp4 >/dev/null; then
+            echo "MP4 container check passed"
+          fi
+
           test -s video.mp4
+
+          echo "FINAL VIDEO CHECK PASSED"
 
       - name: Upload to YouTube
         shell: bash
