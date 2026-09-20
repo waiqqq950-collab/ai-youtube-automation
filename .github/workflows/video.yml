@@ -81,10 +81,9 @@ jobs:
 
           if not isinstance(data["visual_prompts"], list) or len(data["visual_prompts"]) < 3:
               raise SystemExit("Need at least 3 visual prompts")
-
           words = re.findall(r"\S+", data["script"])
-          if len(words) > 100:
-              raise SystemExit(f"Script too long: {len(words)} words")
+          if len(words) > 120:
+           raise SystemExit(f"Script too long: {len(words)} words")
 
           open("script.txt", "w", encoding="utf-8").write(data["script"].strip())
           open("title.txt", "w", encoding="utf-8").write(data["title"].strip())
