@@ -350,6 +350,7 @@ jobs:
             -vf "subtitles=captions.ass,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='AI TOOLS DAILY':fontcolor=white:fontsize=34:x=45:y=55:alpha=0.78" \
             -map 0:v:0 \
             -map 1:a:0 \
+            -map_metadata -1 \
             -c:v libx264 \
             -preset veryfast \
             -profile:v high \
@@ -363,6 +364,7 @@ jobs:
             -bf 2 \
             -flags +cgop \
             -crf 22 \
+            -tag:v avc1 \
             -c:a aac \
             -profile:a aac_low \
             -ar 48000 \
@@ -370,15 +372,17 @@ jobs:
             -b:a 128k \
             -af "aresample=48000:async=1:first_pts=0" \
             -shortest \
+            -avoid_negative_ts make_zero \
             -movflags +faststart \
             -use_editlist 0 \
+            -video_track_timescale 90000 \
             video.mp4
 
           echo "===== FINAL VIDEO CHECK ====="
 
           ffprobe -v error \
-            -show_entries format=duration,size,format_name \
-            -show_entries stream=index,codec_name,profile,level,width,height,pix_fmt,r_frame_rate,avg_frame_rate,sample_rate,channels,channel_layout,bit_rate \
+            -show_entries format=duration,size,format_name,start_time \
+            -show_entries stream=index,codec_name,profile,level,width,height,pix_fmt,r_frame_rate,avg_frame_rate,sample_rate,channels,channel_layout,bit_rate,start_time,duration \
             -of default=nw=1 \
             video.mp4
 
@@ -388,14 +392,12 @@ jobs:
             -i video.mp4 \
             -f null -
 
-          echo "===== EDIT LIST CHECK ====="
+          echo "===== MP4 STRUCTURE CHECK ====="
 
-          if ffprobe -v error \
-            -show_entries format_tags=major_brand \
+          ffprobe -v error \
+            -show_entries format=format_name \
             -of default=nw=1 \
-            video.mp4 >/dev/null; then
-            echo "MP4 container check passed"
-          fi
+            video.mp4
 
           test -s video.mp4
 
